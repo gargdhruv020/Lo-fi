@@ -113,7 +113,18 @@ export default function Player() {
 
   // Catalog panel states
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
-  const [activeSeason, setActiveSeason] = useState<number | "all" | "favourites">("all");
+  const [activeSeason, setActiveSeason] = useState<number | "all" | "favourites">(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedRaw = localStorage.getItem("lofi_player_state");
+        if (savedRaw) {
+          const saved = JSON.parse(savedRaw);
+          if (saved && saved.activeSeason !== undefined) return saved.activeSeason;
+        }
+      } catch (e) {}
+    }
+    return "all";
+  });
   const [searchQuery, setSearchQuery] = useState("");
 
   const playerRef = useRef<HTMLDivElement | null>(null);
@@ -122,6 +133,7 @@ export default function Player() {
   const activeTrackIdRef = useRef(currentTrackId);
   const currentIndexRef = useRef<number>(0);
   const tracksRef = useRef<CatalogTrack[]>(catalog);
+  const activePlaylistRef = useRef<CatalogTrack[]>(catalog);
   const ytPlayerRef = useRef<any>(null);
   const ytContainerRef = useRef<HTMLDivElement | null>(null);
   const timeIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -398,7 +410,22 @@ export default function Player() {
     tracksRef.current = tracks;
   }, [tracks]);
 
-  // Save Player State to LocalStorage on track, time, or control changes
+  // Currently active scoped playlist based on category/season selection
+  const activePlaylistTracks = useMemo(() => {
+    let list = catalog.filter((track) => {
+      if (activeSeason === "all") return true;
+      if (activeSeason === "favourites") return !!track.isFavourite;
+      return track.season === activeSeason;
+    });
+    if (list.length === 0) list = catalog;
+    return list;
+  }, [catalog, activeSeason]);
+
+  useEffect(() => {
+    activePlaylistRef.current = activePlaylistTracks;
+  }, [activePlaylistTracks]);
+
+  // Save Player State to LocalStorage on track, time, control, or season changes
   useEffect(() => {
     if (typeof window === "undefined" || !currentTrackId) return;
 
@@ -410,12 +437,13 @@ export default function Player() {
         volume: volume,
         isMuted: isMuted,
         isShuffled: isShuffled,
+        activeSeason: activeSeason,
       };
       localStorage.setItem("lofi_player_state", JSON.stringify(stateToSave));
     } catch (err) {
       console.warn("Failed to save player state to localStorage:", err);
     }
-  }, [currentTrackId, currentIndex, currentTime, volume, isMuted, isShuffled]);
+  }, [currentTrackId, currentIndex, currentTime, volume, isMuted, isShuffled, activeSeason]);
 
   // Auto-scroll catalog drawer to active track whenever catalog is opened or track changes
   useEffect(() => {
@@ -981,10 +1009,14 @@ export default function Player() {
 
   const handleNext = () => {
     getAudioService().affirmPlaybackState(true);
-    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
-    if (activePlaylist.length === 0) return;
-    const nextIndex = (currentIndexRef.current + 1) % activePlaylist.length;
-    const nextTrack = activePlaylist[nextIndex];
+    const activeList = activePlaylistRef.current.length > 0 ? activePlaylistRef.current : catalog;
+    if (activeList.length === 0) return;
+
+    const currentListIndex = activeList.findIndex((t) => t.id === currentTrackId);
+    const safeIndex = currentListIndex !== -1 ? currentListIndex : 0;
+    const nextIndex = (safeIndex + 1) % activeList.length;
+    const nextTrack = activeList[nextIndex];
+
     if (nextTrack) {
       playTrack(nextTrack, nextIndex);
     }
@@ -992,10 +1024,14 @@ export default function Player() {
 
   const handlePrev = () => {
     getAudioService().affirmPlaybackState(true);
-    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
-    if (activePlaylist.length === 0) return;
-    const prevIndex = (currentIndexRef.current - 1 + activePlaylist.length) % activePlaylist.length;
-    const prevTrack = activePlaylist[prevIndex];
+    const activeList = activePlaylistRef.current.length > 0 ? activePlaylistRef.current : catalog;
+    if (activeList.length === 0) return;
+
+    const currentListIndex = activeList.findIndex((t) => t.id === currentTrackId);
+    const safeIndex = currentListIndex !== -1 ? currentListIndex : 0;
+    const prevIndex = (safeIndex - 1 + activeList.length) % activeList.length;
+    const prevTrack = activeList[prevIndex];
+
     if (prevTrack) {
       playTrack(prevTrack, prevIndex);
     }
