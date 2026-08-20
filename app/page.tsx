@@ -2,12 +2,14 @@ import React from "react";
 import Clock from "./components/Clock";
 import ListenerCount from "./components/ListenerCount";
 import Player from "./components/Player";
+import PullToRefresh from "./components/PullToRefresh";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export default function Home() {
   return (
     <main className="relative flex min-h-dvh flex-1 flex-col items-center justify-between overflow-hidden">
+      <PullToRefresh />
       {/* 1. Fixed background image — uses object-fit for perfect portrait+landscape on all devices */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         {/* eslint-disable-next-line @next/next/no-img-element */}

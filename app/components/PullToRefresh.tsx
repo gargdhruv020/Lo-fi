@@ -5,65 +5,77 @@ import React, { useState, useEffect, useRef } from "react";
 export default function PullToRefresh() {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const startYRef = useRef(0);
-  const isPullingRef = useRef(false);
-  const pullDistanceRef = useRef(0);
-  const isRefreshingRef = useRef(false);
+  const [isThresholdMet, setIsThresholdMet] = useState(false);
 
-  const THRESHOLD = 75;
+  const startYRef = useRef(0);
+  const isCandidateRef = useRef(false);
+  const pullDistanceRef = useRef(0);
+
+  const THRESHOLD = 80; // Distance in pixels required to trigger refresh
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const handleTouchStart = (e: TouchEvent) => {
-      if (isRefreshingRef.current) return;
-      // Only initiate pull-to-refresh when scrolled to the very top
+      // Precise scroll detection: only track if user is at the top of the page
       const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
-      if (scrollTop <= 0 && e.touches.length === 1) {
+      if (scrollTop <= 1 && e.touches.length === 1) {
         startYRef.current = e.touches[0].clientY;
-        isPullingRef.current = true;
+        isCandidateRef.current = true;
+      } else {
+        isCandidateRef.current = false;
       }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (!isPullingRef.current || isRefreshingRef.current) return;
+      if (!isCandidateRef.current || e.touches.length !== 1) return;
 
       const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+      if (scrollTop > 1) {
+        isCandidateRef.current = false;
+        setPullDistance(0);
+        pullDistanceRef.current = 0;
+        setIsThresholdMet(false);
+        return;
+      }
+
       const currentY = e.touches[0].clientY;
-      const deltaY = currentY - startYRef.current;
+      const rawDiff = currentY - startYRef.current;
 
-      if (scrollTop <= 0 && deltaY > 0) {
-        // Apply dampening resistance function
-        const distance = Math.min(100, Math.pow(deltaY, 0.85));
-        pullDistanceRef.current = distance;
-        setPullDistance(distance);
+      if (rawDiff > 0) {
+        // Apply resistance damping factor so pull feels smooth & natural
+        const dampenedDistance = Math.min(130, Math.pow(rawDiff, 0.85) * 2.2);
+        pullDistanceRef.current = dampenedDistance;
+        setPullDistance(dampenedDistance);
+        setIsThresholdMet(dampenedDistance >= THRESHOLD);
 
-        // Prevent native overscroll bounce if pulling significantly
-        if (deltaY > 10 && e.cancelable) {
+        // Prevent default overscroll to stop browser fights
+        if (e.cancelable && rawDiff > 10) {
           e.preventDefault();
         }
       } else {
-        isPullingRef.current = false;
         pullDistanceRef.current = 0;
         setPullDistance(0);
+        setIsThresholdMet(false);
       }
     };
 
     const handleTouchEnd = () => {
-      if (!isPullingRef.current || isRefreshingRef.current) return;
-      isPullingRef.current = false;
+      if (!isCandidateRef.current) return;
+      isCandidateRef.current = false;
 
       if (pullDistanceRef.current >= THRESHOLD) {
-        isRefreshingRef.current = true;
         setIsRefreshing(true);
         setPullDistance(THRESHOLD);
-
+        // Trigger page reload
         setTimeout(() => {
           window.location.reload();
-        }, 300);
+        }, 200);
       } else {
-        pullDistanceRef.current = 0;
+        // Smoothly animate back to top
         setPullDistance(0);
+        setIsThresholdMet(false);
+        pullDistanceRef.current = 0;
       }
     };
 
@@ -78,71 +90,42 @@ export default function PullToRefresh() {
     };
   }, []);
 
-  if (pullDistance <= 0 && !isRefreshing) return null;
-
-  const progressRatio = Math.min(1, pullDistance / THRESHOLD);
-  const isPastThreshold = pullDistance >= THRESHOLD;
+  if (pullDistance === 0 && !isRefreshing) return null;
 
   return (
     <div
-      className="fixed top-3 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-transform duration-150 ease-out"
+      className="fixed top-0 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-transform duration-200 ease-out"
       style={{
-        transform: `translate(-50%, ${isRefreshing ? 12 : Math.max(-60, pullDistance - 60)}px)`,
-        opacity: Math.max(0, Math.min(1, (pullDistance - 15) / 30)),
+        transform: `translate(-50%, ${isRefreshing ? "1.25rem" : `${Math.min(pullDistance * 0.6, 60)}px`})`,
       }}
     >
-      <div className="flex items-center gap-2.5 bg-zinc-950/85 backdrop-blur-2xl border border-white/15 px-4 py-2 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.7)] text-xs font-medium text-white/90">
-        {isRefreshing ? (
-          <>
-            <svg
-              className="animate-spin h-4 w-4 text-rose-400"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-            <span className="bg-gradient-to-r from-rose-400 to-pink-500 bg-clip-text text-transparent font-semibold">
-              Refreshing...
-            </span>
-          </>
-        ) : (
-          <>
-            <div
-              className="transition-transform duration-200"
-              style={{ transform: `rotate(${isPastThreshold ? 180 : progressRatio * 180}deg)` }}
-            >
-              <svg
-                className="w-4 h-4 text-rose-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2.5"
-                  d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                />
-              </svg>
-            </div>
-            <span className={isPastThreshold ? "text-rose-400 font-semibold" : "text-zinc-300"}>
-              {isPastThreshold ? "Release to refresh" : "Pull down to refresh"}
-            </span>
-          </>
-        )}
+      <div className="bg-zinc-950/80 backdrop-blur-xl border border-white/15 px-4 py-2 rounded-full shadow-[0_12px_32px_-8px_rgba(0,0,0,0.8)] flex items-center gap-2.5 text-xs font-medium text-white/90">
+        <svg
+          className={`w-4 h-4 text-rose-400 transition-transform duration-200 ${
+            isRefreshing
+              ? "animate-spin"
+              : isThresholdMet
+              ? "rotate-180 text-rose-300"
+              : ""
+          }`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+          />
+        </svg>
+        <span>
+          {isRefreshing
+            ? "Refreshing..."
+            : isThresholdMet
+            ? "Release to refresh"
+            : "Pull to refresh"}
+        </span>
       </div>
     </div>
   );
