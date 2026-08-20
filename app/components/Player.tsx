@@ -486,9 +486,9 @@ export default function Player() {
     return tracks.find((t) => t.id === currentTrackId) || catalog[0];
   }, [tracks, catalog, currentTrackId]);
 
-  // Filtered tracks list based on Season and Search query
+  // Filtered tracks list based on Season and Search query from full catalog
   const filteredTracks = useMemo(() => {
-    return tracks.filter((track) => {
+    return catalog.filter((track) => {
       const matchesSeason =
         activeSeason === "all" ||
         (activeSeason === "favourites" ? !!track.isFavourite : track.season === activeSeason);
@@ -497,7 +497,12 @@ export default function Player() {
         track.artist.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesSeason && matchesSearch;
     });
-  }, [tracks, activeSeason, searchQuery]);
+  }, [catalog, activeSeason, searchQuery]);
+
+  // Keep tracksRef synced with filteredTracks for Next/Previous playback scoping
+  useEffect(() => {
+    tracksRef.current = filteredTracks.length > 0 ? filteredTracks : catalog;
+  }, [filteredTracks, catalog]);
 
   // Centralized playTrack method to guarantee synchronous playback trigger within the click context
   // Centralized playTrack method to guarantee direct, clean playback of the requested track from start
@@ -1073,14 +1078,10 @@ export default function Player() {
   };
 
   const selectTrack = (track: CatalogTrack) => {
-    if (filteredTracks.length > 0) {
-      setTracks(filteredTracks);
-      tracksRef.current = filteredTracks;
-      const idx = filteredTracks.findIndex((t) => t.id === track.id);
-      playTrack(track, idx !== -1 ? idx : undefined);
-    } else {
-      playTrack(track);
-    }
+    const activePlaylist = filteredTracks.length > 0 ? filteredTracks : catalog;
+    tracksRef.current = activePlaylist;
+    const idx = activePlaylist.findIndex((t) => t.id === track.id);
+    playTrack(track, idx !== -1 ? idx : undefined);
   };
 
   const formatTime = (time: number) => {
@@ -1199,8 +1200,8 @@ export default function Player() {
                   {/* Play All button for this category */}
                   <button
                     onClick={() => {
-                      // Filter tracks for this season
-                      const seasonTracks = tracks.filter((t) =>
+                      // Filter tracks for this season from full catalog
+                      const seasonTracks = catalog.filter((t) =>
                         season === "all"
                           ? true
                           : season === "favourites"
@@ -1209,7 +1210,6 @@ export default function Player() {
                       );
                       if (seasonTracks.length > 0) {
                         setActiveSeason(season);
-                        setTracks(seasonTracks);
                         tracksRef.current = seasonTracks;
                         playTrack(seasonTracks[0], 0);
                       }
