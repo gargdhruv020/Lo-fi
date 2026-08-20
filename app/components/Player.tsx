@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { getHustleCatalog, CatalogTrack } from "../data/catalog";
+import { getAudioService } from "../services/audioService";
 
 export default function Player() {
   // Load entire catalog
@@ -23,14 +24,11 @@ export default function Player() {
       .catch((err) => console.warn("Failed to load initial downloaded tracks:", err));
   }, []);
 
-  // LocalStorage state persistence key
-  const LOCAL_STORAGE_KEY = "lofi_player_state";
-
   // State Management with LocalStorage persistence
   const [currentTrackId, setCurrentTrackId] = useState<string>(() => {
     if (typeof window !== "undefined") {
       try {
-        const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        const savedRaw = localStorage.getItem("lofi_player_state");
         if (savedRaw) {
           const saved = JSON.parse(savedRaw);
           if (saved && saved.trackId) return saved.trackId;
@@ -44,7 +42,7 @@ export default function Player() {
   const [currentIndex, setCurrentIndex] = useState<number>(() => {
     if (typeof window !== "undefined") {
       try {
-        const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        const savedRaw = localStorage.getItem("lofi_player_state");
         if (savedRaw) {
           const saved = JSON.parse(savedRaw);
           if (typeof saved.index === "number") return saved.index;
@@ -59,7 +57,7 @@ export default function Player() {
   const [currentTime, setCurrentTime] = useState<number>(() => {
     if (typeof window !== "undefined") {
       try {
-        const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        const savedRaw = localStorage.getItem("lofi_player_state");
         if (savedRaw) {
           const saved = JSON.parse(savedRaw);
           if (typeof saved.currentTime === "number") return saved.currentTime;
@@ -74,7 +72,7 @@ export default function Player() {
   const [volume, setVolume] = useState<number>(() => {
     if (typeof window !== "undefined") {
       try {
-        const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        const savedRaw = localStorage.getItem("lofi_player_state");
         if (savedRaw) {
           const saved = JSON.parse(savedRaw);
           if (typeof saved.volume === "number") return saved.volume;
@@ -87,7 +85,7 @@ export default function Player() {
   const [isMuted, setIsMuted] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       try {
-        const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        const savedRaw = localStorage.getItem("lofi_player_state");
         if (savedRaw) {
           const saved = JSON.parse(savedRaw);
           if (typeof saved.isMuted === "boolean") return saved.isMuted;
@@ -103,7 +101,7 @@ export default function Player() {
   const [isShuffled, setIsShuffled] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       try {
-        const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        const savedRaw = localStorage.getItem("lofi_player_state");
         if (savedRaw) {
           const saved = JSON.parse(savedRaw);
           if (typeof saved.isShuffled === "boolean") return saved.isShuffled;
@@ -115,33 +113,279 @@ export default function Player() {
 
   // Catalog panel states
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
-  const [activeSeason, setActiveSeason] = useState<number | "all" | "favourites">(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (savedRaw) {
-          const saved = JSON.parse(savedRaw);
-          if (saved && saved.activeSeason !== undefined) return saved.activeSeason;
-        }
-      } catch (e) {}
-    }
-    return "all";
-  });
+  const [activeSeason, setActiveSeason] = useState<number | "all" | "favourites">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const playerRef = useRef<HTMLDivElement | null>(null);
   const catalogListRef = useRef<HTMLDivElement | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
+  const isSwappingSource = useRef(false);
   const activeTrackIdRef = useRef(currentTrackId);
-  const currentIndexRef = useRef<number>(currentIndex);
+  const currentIndexRef = useRef<number>(0);
   const tracksRef = useRef<CatalogTrack[]>(catalog);
-  const activePlaylistRef = useRef<CatalogTrack[]>(catalog);
   const ytPlayerRef = useRef<any>(null);
   const ytContainerRef = useRef<HTMLDivElement | null>(null);
-  const useNativeAudioRef = useRef(true);
+  const timeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const bgAudioRef = useRef<HTMLAudioElement | null>(null);
+  const nativeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const useNativeAudioRef = useRef(false);
+  const shouldPlayOnReadyRef = useRef(false);
+  const queuedVideoIdRef = useRef<string | null>(null);
 
-  // Synchronize mutable refs
+  const wakeLockRef = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const silentNodeRef = useRef<AudioNode | null>(null);
+  const bgWorkerRef = useRef<Worker | null>(null);
+
+  // Screen Wake Lock API helper functions to prevent mobile tab deep sleep
+  const requestWakeLock = async () => {
+    if (typeof window !== "undefined" && "wakeLock" in navigator && !wakeLockRef.current) {
+      try {
+        wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
+        wakeLockRef.current.addEventListener("release", () => {
+          wakeLockRef.current = null;
+        });
+      } catch (err) {
+        console.warn("Wake Lock request failed:", err);
+      }
+    }
+  };
+
+  const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+      } catch (err) {
+        console.warn("Wake Lock release failed:", err);
+      }
+      wakeLockRef.current = null;
+    }
+  };
+
+  // Audio Context State Maintenance helper to prevent Web Audio / AudioContext pause on focus loss
+  const ensureAudioContext = () => {
+    if (typeof window === "undefined") return;
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new AudioCtx();
+      } catch (e) {}
+    }
+
+    if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+      audioContextRef.current.resume().catch(() => {});
+    }
+  };
+
+  // Web Audio Master Gain / Low-frequency Oscillator Stream — keeps AudioContext state strictly locked to 'running'
+  const startSilentAudioNode = () => {
+    if (typeof window === "undefined") return;
+    try {
+      ensureAudioContext();
+      const ctx = audioContextRef.current;
+      if (!ctx) return;
+
+      if (ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
+
+      if (!silentNodeRef.current) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = 50; // Continuous 50Hz low-frequency stream
+        gain.gain.value = 0.0001; // Silent inaudible gain
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        silentNodeRef.current = osc;
+      }
+    } catch (e) {
+      console.warn("Failed to start Web Audio master stream:", e);
+    }
+  };
+
+  const stopSilentAudioNode = () => {
+    if (silentNodeRef.current) {
+      try {
+        (silentNodeRef.current as any).stop?.();
+        silentNodeRef.current.disconnect();
+      } catch (e) {}
+      silentNodeRef.current = null;
+    }
+  };
+
+  // Load YouTube Iframe Player API script dynamically on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Intercept MediaSession calls to prevent YouTube iframe from hijacking controls
+    if ("mediaSession" in navigator) {
+      const originalSetActionHandler = navigator.mediaSession.setActionHandler;
+      navigator.mediaSession.setActionHandler = function (action, callback) {
+        // Prevent clearing next/prev track action handlers
+        if ((action === "nexttrack" || action === "previoustrack") && !callback) {
+          return;
+        }
+        return originalSetActionHandler.call(navigator.mediaSession, action, callback);
+      };
+
+      // Intercept metadata sets to prevent YouTube from replacing our song info
+      try {
+        const mediaSessionProto = Object.getPrototypeOf(navigator.mediaSession);
+        const originalDescriptor = Object.getOwnPropertyDescriptor(mediaSessionProto, "metadata");
+        if (originalDescriptor && originalDescriptor.set) {
+          Object.defineProperty(navigator.mediaSession, "metadata", {
+            configurable: true,
+            enumerable: true,
+            get() {
+              return originalDescriptor.get ? originalDescriptor.get.call(this) : null;
+            },
+            set(value) {
+              // If the metadata is from YouTube (does not match our current track title), block it!
+              if (
+                (window as any).__customTrackTitle &&
+                value &&
+                value.title !== (window as any).__customTrackTitle
+              ) {
+                return;
+              }
+              return originalDescriptor.set!.call(this, value);
+            },
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to patch mediaSession.metadata descriptor:", err);
+      }
+    }
+    
+    const initOnScriptLoad = () => {
+      if ((window as any).YT && (window as any).YT.Player) {
+        initYoutubePlayer("jfKfPfyJRdk");
+      }
+    };
+
+    if ((window as any).YT) {
+      initOnScriptLoad();
+      return;
+    }
+
+    // Setup global callback for YouTube script
+    (window as any).onYouTubeIframeAPIReady = () => {
+      initOnScriptLoad();
+    };
+    
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    const firstScriptTag = document.getElementsByTagName("script")[0];
+    firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+  }, []);
+
+  const updateMediaSession = () => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator) || !currentTrack) return;
+
+    (window as any).__customTrackTitle = currentTrack.title;
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+
+    // Force our metadata to override the YouTube iframe's metadata
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentTrack.title,
+      artist: currentTrack.artist,
+      album: `Lo-Fi Radio — ${currentTrack.season === 1 ? "90s & 2000s" : currentTrack.season === 2 ? "Retro & Golden Era" : "Modern & Indie"}`,
+      artwork: [
+        { src: currentTrack.cover, sizes: "512x512", type: "image/jpeg" },
+      ],
+    });
+
+    // Re-bind action handlers to ensure they point to our controller instead of YouTube's defaults
+    navigator.mediaSession.setActionHandler("play", () => {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "playing";
+      }
+      handlePlayPause();
+    });
+    navigator.mediaSession.setActionHandler("pause", () => {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "paused";
+      }
+      handlePlayPause();
+    });
+    navigator.mediaSession.setActionHandler("previoustrack", () => {
+      getAudioService().affirmPlaybackState(true);
+      handlePrev();
+    });
+    navigator.mediaSession.setActionHandler("nexttrack", () => {
+      getAudioService().affirmPlaybackState(true);
+      handleNext();
+    });
+    navigator.mediaSession.setActionHandler("seekbackward", () => {
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        const newTime = Math.max(0, nativeAudioRef.current.currentTime - 10);
+        nativeAudioRef.current.currentTime = newTime;
+        setCurrentTime(newTime);
+      } else {
+        const player = ytPlayerRef.current;
+        if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
+          const newTime = Math.max(0, player.getCurrentTime() - 10);
+          player.seekTo(newTime, true);
+          setCurrentTime(newTime);
+        }
+      }
+    });
+    navigator.mediaSession.setActionHandler("seekforward", () => {
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        const newTime = Math.min(nativeAudioRef.current.duration || 0, nativeAudioRef.current.currentTime + 10);
+        nativeAudioRef.current.currentTime = newTime;
+        setCurrentTime(newTime);
+      } else {
+        const player = ytPlayerRef.current;
+        if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
+          const newTime = Math.min(player.getDuration() || 0, player.getCurrentTime() + 10);
+          player.seekTo(newTime, true);
+          setCurrentTime(newTime);
+        }
+      }
+    });
+  };
+
+  const startTimeSyncInterval = () => {
+    if (timeIntervalRef.current) clearInterval(timeIntervalRef.current);
+    timeIntervalRef.current = setInterval(() => {
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        // Native audio is the active engine
+        const audio = nativeAudioRef.current;
+        if (!audio.paused && !isSeeking) {
+          setCurrentTime(audio.currentTime || 0);
+          setDuration(audio.duration || 0);
+          updateMediaPosition();
+        }
+      } else {
+        // YouTube iframe is the active engine
+        const player = ytPlayerRef.current;
+        if (player && typeof player.getCurrentTime === "function" && typeof player.getPlayerState === "function") {
+          const state = player.getPlayerState();
+          if (state === 1 && !isSeeking) {
+            setCurrentTime(player.getCurrentTime() || 0);
+            setDuration(player.getDuration() || 0);
+            updateMediaPosition();
+          }
+        }
+      }
+    }, 500);
+  };
+
+  const stopTimeSyncInterval = () => {
+    if (timeIntervalRef.current) {
+      clearInterval(timeIntervalRef.current);
+      timeIntervalRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => stopTimeSyncInterval();
+  }, []);
+
   useEffect(() => {
     activeTrackIdRef.current = currentTrackId;
   }, [currentTrackId]);
@@ -154,22 +398,7 @@ export default function Player() {
     tracksRef.current = tracks;
   }, [tracks]);
 
-  // Currently active scoped playlist based on category/season selection
-  const activePlaylistTracks = useMemo(() => {
-    let list = catalog.filter((track) => {
-      if (activeSeason === "all") return true;
-      if (activeSeason === "favourites") return !!track.isFavourite;
-      return track.season === activeSeason;
-    });
-    if (list.length === 0) list = catalog;
-    return list;
-  }, [catalog, activeSeason]);
-
-  useEffect(() => {
-    activePlaylistRef.current = activePlaylistTracks;
-  }, [activePlaylistTracks]);
-
-  // Save Player State to LocalStorage on changes
+  // Save Player State to LocalStorage on track, time, or control changes
   useEffect(() => {
     if (typeof window === "undefined" || !currentTrackId) return;
 
@@ -181,15 +410,14 @@ export default function Player() {
         volume: volume,
         isMuted: isMuted,
         isShuffled: isShuffled,
-        activeSeason: activeSeason,
       };
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
+      localStorage.setItem("lofi_player_state", JSON.stringify(stateToSave));
     } catch (err) {
       console.warn("Failed to save player state to localStorage:", err);
     }
-  }, [currentTrackId, currentIndex, currentTime, volume, isMuted, isShuffled, activeSeason]);
+  }, [currentTrackId, currentIndex, currentTime, volume, isMuted, isShuffled]);
 
-  // Auto-scroll catalog drawer to active track whenever catalog is opened
+  // Auto-scroll catalog drawer to active track whenever catalog is opened or track changes
   useEffect(() => {
     if (isCatalogOpen && catalogListRef.current) {
       const timer = setTimeout(() => {
@@ -202,15 +430,20 @@ export default function Player() {
     }
   }, [isCatalogOpen, currentTrackId]);
 
-  // Sync audio volume
+  // Initialize tracks and bind Global Audio Service Singleton on client mount
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : volume;
+    setTracks(catalog);
+    tracksRef.current = catalog;
+    if (typeof window !== "undefined") {
+      const audioService = getAudioService();
+      if (audioService.audioElement) {
+        nativeAudioRef.current = audioService.audioElement;
+      }
+      if (audioService.bgAudioElement) {
+        bgAudioRef.current = audioService.bgAudioElement;
+      }
     }
-    if (ytPlayerRef.current && typeof ytPlayerRef.current.setVolume === "function") {
-      ytPlayerRef.current.setVolume(isMuted ? 0 : volume * 100);
-    }
-  }, [volume, isMuted]);
+  }, [catalog]);
 
   // Click outside to close catalog drawer automatically
   useEffect(() => {
@@ -228,10 +461,10 @@ export default function Player() {
     };
   }, [isCatalogOpen]);
 
-  // Current track object — resolves directly against full catalog
+  // Current track object
   const currentTrack = useMemo(() => {
-    return catalog.find((t) => t.id === currentTrackId) || tracks.find((t) => t.id === currentTrackId) || catalog[0];
-  }, [catalog, tracks, currentTrackId]);
+    return tracks.find((t) => t.id === currentTrackId) || catalog[0];
+  }, [tracks, catalog, currentTrackId]);
 
   // Filtered tracks list based on Season and Search query
   const filteredTracks = useMemo(() => {
@@ -246,158 +479,135 @@ export default function Player() {
     });
   }, [tracks, activeSeason, searchQuery]);
 
-  // Media Session Metadata update helper
-  const updateMediaSessionMetadata = (track: CatalogTrack) => {
-    if (typeof window === "undefined" || !("mediaSession" in navigator) || !track) return;
+  // Centralized playTrack method to guarantee synchronous playback trigger within the click context
+  // Centralized playTrack method to guarantee direct, clean playback of the requested track from start
+  const initYoutubePlayer = (initialVideoId: string) => {
+    if (typeof window === "undefined" || !(window as any).YT || !(window as any).YT.Player || !ytContainerRef.current) return;
 
-    try {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.title,
-        artist: track.artist,
-        album: `Lo-Fi Radio — ${track.season === 1 ? "90s & 2000s" : track.season === 2 ? "Retro & Golden Era" : "Modern & Indie"}`,
-        artwork: [
-          { src: track.cover, sizes: "512x512", type: "image/jpeg" },
-          { src: track.cover, sizes: "256x256", type: "image/jpeg" },
-          { src: track.cover, sizes: "96x96", type: "image/jpeg" },
-        ],
-      });
-    } catch (err) {
-      console.warn("Failed to set Media Session metadata:", err);
-    }
-  };
-
-  // Helper refs for Media Session actions to prevent stale closures
-  const handleNextRef = useRef<() => void>(() => {});
-  const handlePrevRef = useRef<() => void>(() => {});
-  const handlePlayPauseRef = useRef<() => void>(() => {});
-
-  // Update Media Session action handlers once on mount
-  useEffect(() => {
-    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
-
-    const setAction = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
-      try {
-        navigator.mediaSession.setActionHandler(action, handler);
-      } catch (e) {}
-    };
-
-    setAction("play", async () => {
-      if (audioRef.current && useNativeAudioRef.current) {
-        try {
-          await audioRef.current.play();
-        } catch (err) {
-          console.error("MediaSession play failed:", err);
+    ytPlayerRef.current = new (window as any).YT.Player(ytContainerRef.current, {
+      height: "200",
+      width: "200",
+      videoId: initialVideoId,
+      playerVars: {
+        autoplay: 0, // Disable automatic play on instantiation to respect security policies
+        controls: 0,
+        disablekb: 1,
+        fs: 0,
+        modestbranding: 1,
+        rel: 0,
+        showinfo: 0,
+        origin: typeof window !== "undefined" ? window.location.origin : "",
+      },
+      events: {
+        onReady: (event: any) => {
+          event.target.setVolume(isMuted ? 0 : volume * 100);
+          if (shouldPlayOnReadyRef.current) {
+            const videoIdToPlay = queuedVideoIdRef.current || initialVideoId;
+            event.target.loadVideoById(videoIdToPlay);
+            event.target.playVideo();
+            bgAudioRef.current?.play().catch(() => {});
+            setIsPlaying(true);
+            setIsLoadingTrack(false);
+            startTimeSyncInterval();
+            updateMediaSession();
+            shouldPlayOnReadyRef.current = false;
+          }
+        },
+        onStateChange: (event: any) => {
+          // ENDED is 0, PLAYING is 1, PAUSED is 2
+          if (event.data === 0) {
+            stopTimeSyncInterval();
+            bgAudioRef.current?.pause();
+            handleEnded();
+          } else if (event.data === 1) {
+            setIsPlaying(true);
+            setIsLoadingTrack(false);
+            bgAudioRef.current?.play().catch(() => {});
+            startTimeSyncInterval();
+            updateMediaSession();
+          } else if (event.data === 2) {
+            setIsPlaying(false);
+            bgAudioRef.current?.pause();
+            stopTimeSyncInterval();
+          }
+        },
+        onError: (event: any) => {
+          console.error("YouTube Player encountered an error code:", event.data);
+          setIsLoadingTrack(false);
+          handleAudioError();
         }
-      } else {
-        handlePlayPauseRef.current();
       }
     });
+  };
 
-    setAction("pause", () => {
-      if (audioRef.current && useNativeAudioRef.current) {
-        audioRef.current.pause();
-      } else {
-        handlePlayPauseRef.current();
-      }
-    });
-
-    setAction("previoustrack", () => {
-      handlePrevRef.current();
-    });
-
-    setAction("nexttrack", () => {
-      handleNextRef.current();
-    });
-
-    setAction("seekbackward", (details) => {
-      const skip = details.seekOffset || 10;
-      if (audioRef.current && useNativeAudioRef.current) {
-        audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - skip);
-      }
-    });
-
-    setAction("seekforward", (details) => {
-      const skip = details.seekOffset || 10;
-      if (audioRef.current && useNativeAudioRef.current) {
-        audioRef.current.currentTime = Math.min(audioRef.current.duration || 0, audioRef.current.currentTime + skip);
-      }
-    });
-
-    setAction("seekto", (details) => {
-      if (details.seekTime !== undefined && details.seekTime !== null && audioRef.current && useNativeAudioRef.current) {
-        audioRef.current.currentTime = details.seekTime;
-      }
-    });
-  }, []);
-
-  // Sync Media Session Metadata when currentTrack changes
-  useEffect(() => {
-    if (currentTrack) {
-      updateMediaSessionMetadata(currentTrack);
-    }
-  }, [currentTrack]);
-
-  // Native HTML5 Audio Event Handlers with Diagnostic Logging
-  const handleNativePlay = () => {
-    console.log("=== AUDIO EVENT: play ===");
-    setIsPlaying(true);
-    setIsLoadingTrack(false);
-    if (typeof window !== "undefined" && "mediaSession" in navigator) {
-      navigator.mediaSession.playbackState = "playing";
+  // Helper to stop the native audio element
+  const stopNativeAudio = () => {
+    if (nativeAudioRef.current) {
+      nativeAudioRef.current.pause();
+      nativeAudioRef.current.removeAttribute("src");
+      nativeAudioRef.current.load();
     }
   };
 
-  const handleNativePause = () => {
-    console.log("=== AUDIO EVENT: pause ===");
-    setIsPlaying(false);
-    if (typeof window !== "undefined" && "mediaSession" in navigator) {
-      navigator.mediaSession.playbackState = "paused";
+  // Helper to stop the YouTube iframe
+  const stopYoutubePlayer = () => {
+    const player = ytPlayerRef.current;
+    if (player && typeof player.pauseVideo === "function") {
+      try { player.pauseVideo(); } catch {}
     }
   };
 
-  const handleNativeTimeUpdate = () => {
-    if (audioRef.current && !isSeeking) {
-      setCurrentTime(audioRef.current.currentTime || 0);
+  // Start playback via Dual-Audio Element Buffer Swap (supports mobile background without notification drops)
+  const startNativeAudio = (audioUrl: string, initialTime?: number) => {
+    useNativeAudioRef.current = true;
+    stopYoutubePlayer();
+
+    getAudioService()
+      .swapAndPlay(audioUrl, volume, isMuted, initialTime || currentTime)
+      .then(() => {
+        nativeAudioRef.current = getAudioService().activeAudio;
+        if (activeTrackIdRef.current) {
+          setIsPlaying(true);
+          setIsLoadingTrack(false);
+          startTimeSyncInterval();
+          updateMediaSession();
+        }
+      })
+      .catch((err) => {
+        console.warn("Dual audio swap play failed, falling back to YouTube iframe:", err);
+        useNativeAudioRef.current = false;
+      });
+
+    return true;
+  };
+
+  // Start playback via YouTube iframe (fallback for desktop / when Invidious fails)
+  const startYoutubePlayback = (videoId: string) => {
+    useNativeAudioRef.current = false;
+    stopNativeAudio();
+
+    const player = ytPlayerRef.current;
+    if (player && typeof player.loadVideoById === "function") {
+      player.loadVideoById(videoId);
+      player.playVideo();
+      bgAudioRef.current?.play().catch(() => {});
+      setIsPlaying(true);
+      setIsLoadingTrack(false);
+      startTimeSyncInterval();
+      updateMediaSession();
+    } else {
+      // Queue it for when the player becomes ready
+      queuedVideoIdRef.current = videoId;
+      shouldPlayOnReadyRef.current = true;
     }
   };
 
-  const handleNativeLoadedMetadata = () => {
-    console.log("=== AUDIO EVENT: loadedmetadata ===", { duration: audioRef.current?.duration });
-    if (audioRef.current) {
-      setDuration(audioRef.current.duration || 0);
-    }
-  };
-
-  const handleNativeEnded = () => {
-    console.log("=== AUDIO EVENT: ended ===");
-    handleNext();
-  };
-
-  const handleNativeError = (e: any) => {
-    const errObj = audioRef.current?.error;
-    console.error("=== AUDIO EVENT: error ===", {
-      code: errObj?.code,
-      message: errObj?.message,
-      errorCodeMapped:
-        errObj?.code === 1
-          ? "MEDIA_ERR_ABORTED"
-          : errObj?.code === 2
-          ? "MEDIA_ERR_NETWORK"
-          : errObj?.code === 3
-          ? "MEDIA_ERR_DECODE"
-          : errObj?.code === 4
-          ? "MEDIA_ERR_SRC_NOT_SUPPORTED"
-          : "UNKNOWN",
-    });
-    setIsLoadingTrack(false);
-  };
-
-  // Centralized playTrack method
-  const playTrack = async (track: CatalogTrack, explicitIndex?: number) => {
+  // Centralized playTrack method — tries native audio for mobile background, falls back to YouTube iframe
+  const playTrack = (track: CatalogTrack, explicitIndex?: number) => {
     if (!track) return;
 
-    const activeList = activePlaylistRef.current.length > 0 ? activePlaylistRef.current : catalog;
-    const idx = explicitIndex !== undefined ? explicitIndex : activeList.findIndex((t) => t.id === track.id);
+    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+    const idx = explicitIndex !== undefined ? explicitIndex : activePlaylist.findIndex((t) => t.id === track.id);
     const validIndex = idx !== -1 ? idx : 0;
 
     setCurrentIndex(validIndex);
@@ -405,131 +615,352 @@ export default function Player() {
     setCurrentTrackId(track.id);
     activeTrackIdRef.current = track.id;
     setIsLoadingTrack(true);
+    setIsPlaying(false);
+    stopTimeSyncInterval();
+    stopNativeAudio();
+    bgAudioRef.current?.pause();
 
-    // Update Media Session metadata immediately
-    updateMediaSessionMetadata(track);
+    // Secure browser user-gesture token by executing a play command synchronously
+    const player = ytPlayerRef.current;
+    if (player && typeof player.playVideo === "function") {
+      try {
+        player.playVideo();
+        player.pauseVideo();
+      } catch (e) {}
+    }
 
-    let targetUrl = track.url; // High-availability fallback MP3 URL
+    // Secure background keep-alive + native audio permissions synchronously in click handler
+    bgAudioRef.current?.play().then(() => bgAudioRef.current?.pause()).catch(() => {});
+    if (nativeAudioRef.current) {
+      nativeAudioRef.current.play().then(() => nativeAudioRef.current?.pause()).catch(() => {});
+    }
 
-    try {
+    // Fetch the YouTube Video ID (and optionally a direct audio URL)
+    const queryParams = new URLSearchParams({
+      id: track.id,
+      title: track.title,
+      artist: track.artist,
+      season: String(track.season),
+    });
+
+    fetch(`/api/play?${queryParams.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        // Only proceed if the user is still on this track
+        if (activeTrackIdRef.current !== track.id) return;
+
+        if (!data.videoId) {
+          console.error("No video ID returned from API");
+          setIsLoadingTrack(false);
+          return;
+        }
+
+        // Try native audio first (works in mobile background), fall back to YouTube iframe
+        if (data.audioUrl) {
+          const audio = nativeAudioRef.current;
+          if (audio) {
+            useNativeAudioRef.current = true;
+            stopYoutubePlayer();
+
+            audio.src = data.audioUrl;
+            audio.volume = isMuted ? 0 : volume;
+            audio.load();
+
+            const playPromise = audio.play();
+            if (playPromise) {
+              playPromise
+                .then(() => {
+                  if (activeTrackIdRef.current === track.id) {
+                    bgAudioRef.current?.play().catch(() => {});
+                    setIsPlaying(true);
+                    setIsLoadingTrack(false);
+                    startTimeSyncInterval();
+                    updateMediaSession();
+                  }
+                })
+                .catch(() => {
+                  // Native audio failed, fall back to YouTube iframe
+                  console.warn("Native audio failed, falling back to YouTube iframe");
+                  useNativeAudioRef.current = false;
+                  startYoutubePlayback(data.videoId);
+                });
+            }
+          } else {
+            startYoutubePlayback(data.videoId);
+          }
+        } else {
+          // No audio URL available, use YouTube iframe directly
+          startYoutubePlayback(data.videoId);
+        }
+      })
+      .catch((downloaderErr) => {
+        console.error("Downloader API failed:", downloaderErr);
+        setIsLoadingTrack(false);
+      });
+  };
+
+  // Predictive prefetching for next and previous tracks in the background
+  useEffect(() => {
+    if (tracks.length === 0 || !currentTrack) return;
+
+    // Helper to request a download in the background without blocking the UI
+    const prefetchTrack = (track: CatalogTrack) => {
       const queryParams = new URLSearchParams({
         id: track.id,
         title: track.title,
         artist: track.artist,
         season: String(track.season),
       });
+      fetch(`/api/play?${queryParams.toString()}`).catch(() => {});
+    };
 
-      const res = await fetch(`/api/play?${queryParams.toString()}`);
-      const data = await res.json();
+    // Wait 1.5 seconds of continuous playback before prefetching (to avoid spamming skips)
+    const prefetchTimer = setTimeout(() => {
+      const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+      if (activePlaylist.length === 0) return;
 
-      if (data && data.audioUrl) {
-        targetUrl = data.audioUrl;
+      const nextIndex = (currentIndexRef.current + 1) % activePlaylist.length;
+      const prevIndex = (currentIndexRef.current - 1 + activePlaylist.length) % activePlaylist.length;
+
+      const nextTrack = activePlaylist[nextIndex];
+      const prevTrack = activePlaylist[prevIndex];
+
+      if (nextTrack) prefetchTrack(nextTrack);
+      if (prevTrack) prefetchTrack(prevTrack);
+    }, 1500);
+
+    return () => clearTimeout(prefetchTimer);
+  }, [currentTrackId, tracks, catalog]);
+
+  // Global keyboard shortcut: Spacebar to toggle Play/Pause
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ignore key events if the user is currently typing in an input or textarea
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.getAttribute("contenteditable") === "true")
+      ) {
+        return;
       }
-    } catch (err) {
-      console.warn("API play route call failed, using direct track fallback URL:", err);
-    }
 
-    if (activeTrackIdRef.current !== track.id) return;
-
-    if (targetUrl && audioRef.current) {
-      useNativeAudioRef.current = true;
-      const audio = audioRef.current;
-      audio.src = targetUrl;
-      audio.volume = isMuted ? 0 : volume;
-      audio.load();
-
-      console.log("=== MOBILE PLAY DEBUG ===", {
-        src: audio.src,
-        currentSrc: audio.currentSrc,
-        readyState: audio.readyState,
-        networkState: audio.networkState,
-        paused: audio.paused,
-        ended: audio.ended,
-        muted: audio.muted,
-        volume: audio.volume,
-        duration: audio.duration,
-      });
-
-      try {
-        await audio.play();
-        console.log("=== AUDIO PLAY SUCCESS ===", {
-          src: audio.src,
-          currentSrc: audio.currentSrc,
-          readyState: audio.readyState,
-        });
-      } catch (err: any) {
-        console.error("=== AUDIO PLAY FAILED ===", {
-          name: err?.name,
-          message: err?.message,
-          src: audio.src,
-          readyState: audio.readyState,
-          error: audio.error ? { code: audio.error.code, message: audio.error.message } : null,
-        });
-        setIsLoadingTrack(false);
+      if (event.code === "Space") {
+        event.preventDefault(); // Prevent standard page scroll on spacebar press
+        handlePlayPause();
       }
-    } else {
-      console.warn("No target audio URL available for track:", track.title);
-      setIsLoadingTrack(false);
-    }
-  };
+    };
 
-  const handlePlayPause = async () => {
-    if (useNativeAudioRef.current && audioRef.current) {
-      const audio = audioRef.current;
-      if (audio.paused) {
-        if (!audio.src || audio.src === "") {
-          await playTrack(currentTrack);
-        } else {
-          try {
-            await audio.play();
-            console.log("AUDIO PLAY TOGGLE SUCCESS", { src: audio.src, readyState: audio.readyState });
-          } catch (err: any) {
-            console.error("AUDIO PLAY TOGGLE FAILED", { name: err?.name, message: err?.message, src: audio.src });
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isPlaying]);
+
+  // Sync volume state
+  useEffect(() => {
+    const player = ytPlayerRef.current;
+    if (player && typeof player.setVolume === "function") {
+      player.setVolume(isMuted ? 0 : volume * 100);
+    }
+    if (nativeAudioRef.current) {
+      nativeAudioRef.current.volume = isMuted ? 0 : volume;
+    }
+  }, [volume, isMuted]);
+
+  // Lightweight Background Web Worker fallback timer trick to prevent mobile power-saving CPU throttle
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof Worker === "undefined") return;
+
+    const workerCode = `
+      let timer = null;
+      self.onmessage = function(e) {
+        if (e.data === 'start') {
+          if (timer) clearInterval(timer);
+          timer = setInterval(() => { self.postMessage('tick'); }, 1000);
+        } else if (e.data === 'stop') {
+          if (timer) { clearInterval(timer); timer = null; }
+        }
+      };
+    `;
+    const blob = new Blob([workerCode], { type: "application/javascript" });
+    const workerUrl = URL.createObjectURL(blob);
+    const worker = new Worker(workerUrl);
+
+    worker.onmessage = () => {
+      // Background worker heartbeat callback — ensures native audio keeps playing when backgrounded
+      if (useNativeAudioRef.current && nativeAudioRef.current && nativeAudioRef.current.paused) {
+        if ((window as any).__isPlayingRequested) {
+          nativeAudioRef.current.play().catch(() => {});
+        }
+      }
+    };
+
+    bgWorkerRef.current = worker;
+
+    return () => {
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+    };
+  }, []);
+
+  // Sync Media Session playback state, Wake Lock, Audio Context & Background Worker via Global Audio Service
+  useEffect(() => {
+    getAudioService().setPlaybackState(isPlaying);
+  }, [isPlaying]);
+
+  // Handle tab visibility restoration: re-acquire Screen Wake Lock & resume Audio Context whenever document.hidden becomes false
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const isVisible = !document.hidden && document.visibilityState === "visible";
+      if (isVisible) {
+        // Explicitly resume Audio Context whenever page visibility is restored
+        ensureAudioContext();
+        if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+          audioContextRef.current.resume().catch(() => {});
+        }
+
+        if ((window as any).__isPlayingRequested || isPlaying) {
+          requestWakeLock();
+          startSilentAudioNode();
+          if (useNativeAudioRef.current && nativeAudioRef.current && nativeAudioRef.current.paused) {
+            nativeAudioRef.current.play().catch(() => {});
           }
         }
+
+        const player = ytPlayerRef.current;
+        if (player && typeof player.getCurrentTime === "function") {
+          setCurrentTime(player.getCurrentTime() || 0);
+          setDuration(player.getDuration() || 0);
+          updateMediaPosition();
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isPlaying]);
+
+  // Media Session API — enables Bluetooth headphones, lock screen, and system media controls
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || !currentTrack) return;
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentTrack.title,
+      artist: currentTrack.artist,
+      album: `Lo-Fi Radio — ${currentTrack.season === 1 ? "90s & 2000s" : currentTrack.season === 2 ? "Retro & Golden Era" : "Modern & Indie"}`,
+      artwork: [
+        { src: currentTrack.cover, sizes: "512x512", type: "image/jpeg" },
+      ],
+    });
+
+    navigator.mediaSession.setActionHandler("play", () => {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "playing";
+      }
+      handlePlayPause();
+    });
+    navigator.mediaSession.setActionHandler("pause", () => {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "paused";
+      }
+      handlePlayPause();
+    });
+    navigator.mediaSession.setActionHandler("previoustrack", () => {
+      getAudioService().affirmPlaybackState(true);
+      handlePrev();
+    });
+    navigator.mediaSession.setActionHandler("nexttrack", () => {
+      getAudioService().affirmPlaybackState(true);
+      handleNext();
+    });
+    navigator.mediaSession.setActionHandler("seekbackward", () => {
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        const newTime = Math.max(0, nativeAudioRef.current.currentTime - 10);
+        nativeAudioRef.current.currentTime = newTime;
+        setCurrentTime(newTime);
       } else {
+        const player = ytPlayerRef.current;
+        if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
+          const newTime = Math.max(0, player.getCurrentTime() - 10);
+          player.seekTo(newTime, true);
+          setCurrentTime(newTime);
+        }
+      }
+    });
+    navigator.mediaSession.setActionHandler("seekforward", () => {
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        const newTime = Math.min(nativeAudioRef.current.duration || 0, nativeAudioRef.current.currentTime + 10);
+        nativeAudioRef.current.currentTime = newTime;
+        setCurrentTime(newTime);
+      } else {
+        const player = ytPlayerRef.current;
+        if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
+          const newTime = Math.min(player.getDuration() || 0, player.getCurrentTime() + 10);
+          player.seekTo(newTime, true);
+          setCurrentTime(newTime);
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTrackId, currentTrack, tracks]);
+
+  const handleAudioError = () => {
+    console.warn("Audio playback encountered an error, skipping to next track.");
+    handleNext();
+  };
+
+  const handlePlayPause = () => {
+    // If native audio is the active engine
+    if (useNativeAudioRef.current && nativeAudioRef.current) {
+      const audio = nativeAudioRef.current;
+      if (audio.paused) {
+        if ("mediaSession" in navigator) {
+          navigator.mediaSession.playbackState = "playing";
+        }
+        audio.play().catch(() => {});
+        bgAudioRef.current?.play().catch(() => {});
+        setIsPlaying(true);
+        startTimeSyncInterval();
+      } else {
+        if ("mediaSession" in navigator) {
+          navigator.mediaSession.playbackState = "paused";
+        }
         audio.pause();
+        bgAudioRef.current?.pause();
+        setIsPlaying(false);
+        stopTimeSyncInterval();
       }
       return;
     }
-  };
 
-  const handleNext = () => {
-    const activeList = activePlaylistRef.current.length > 0 ? activePlaylistRef.current : catalog;
-    if (activeList.length === 0) return;
-
-    const liveTrackId = activeTrackIdRef.current || currentTrackId;
-    const currentListIndex = activeList.findIndex((t) => t.id === liveTrackId);
-    const safeIndex = currentListIndex !== -1 ? currentListIndex : currentIndexRef.current;
-    const nextIndex = (safeIndex + 1) % activeList.length;
-    const nextTrack = activeList[nextIndex];
-
-    if (nextTrack) {
-      playTrack(nextTrack, nextIndex);
+    // YouTube iframe engine
+    if (!ytPlayerRef.current || typeof ytPlayerRef.current.playVideo !== "function") {
+      playTrack(currentTrack);
+      return;
+    }
+    try {
+      const state = ytPlayerRef.current.getPlayerState();
+      if (state === 1) {
+        ytPlayerRef.current.pauseVideo();
+        bgAudioRef.current?.pause();
+        setIsPlaying(false);
+        stopTimeSyncInterval();
+      } else {
+        ytPlayerRef.current.playVideo();
+        bgAudioRef.current?.play().catch(() => {});
+        setIsPlaying(true);
+        startTimeSyncInterval();
+        updateMediaSession();
+      }
+    } catch (err) {
+      console.warn("Direct play toggle failed, re-initializing track:", err);
+      playTrack(currentTrack);
     }
   };
-
-  const handlePrev = () => {
-    const activeList = activePlaylistRef.current.length > 0 ? activePlaylistRef.current : catalog;
-    if (activeList.length === 0) return;
-
-    const liveTrackId = activeTrackIdRef.current || currentTrackId;
-    const currentListIndex = activeList.findIndex((t) => t.id === liveTrackId);
-    const safeIndex = currentListIndex !== -1 ? currentListIndex : currentIndexRef.current;
-    const prevIndex = (safeIndex - 1 + activeList.length) % activeList.length;
-    const prevTrack = activeList[prevIndex];
-
-    if (prevTrack) {
-      playTrack(prevTrack, prevIndex);
-    }
-  };
-
-  // Sync ref pointers for action handlers
-  useEffect(() => {
-    handleNextRef.current = handleNext;
-    handlePrevRef.current = handlePrev;
-    handlePlayPauseRef.current = handlePlayPause;
-  });
 
   const handleShuffle = () => {
     const shuffleArray = (arr: CatalogTrack[]): CatalogTrack[] => {
@@ -544,6 +975,7 @@ export default function Player() {
     };
 
     if (isShuffled) {
+      // Turn off shuffle: restore original catalog order
       setTracks(catalog);
       tracksRef.current = catalog;
       setIsShuffled(false);
@@ -552,6 +984,7 @@ export default function Player() {
       setCurrentIndex(safeIndex);
       currentIndexRef.current = safeIndex;
     } else {
+      // Turn on shuffle: randomize the track list
       const shuffled = shuffleArray(tracks);
       setTracks(shuffled);
       tracksRef.current = shuffled;
@@ -563,6 +996,56 @@ export default function Player() {
     }
   };
 
+  const handleNext = () => {
+    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+    if (activePlaylist.length === 0) return;
+    const nextIndex = (currentIndexRef.current + 1) % activePlaylist.length;
+    const nextTrack = activePlaylist[nextIndex];
+    if (nextTrack) {
+      playTrack(nextTrack, nextIndex);
+    }
+  };
+
+  const handlePrev = () => {
+    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+    if (activePlaylist.length === 0) return;
+    const prevIndex = (currentIndexRef.current - 1 + activePlaylist.length) % activePlaylist.length;
+    const prevTrack = activePlaylist[prevIndex];
+    if (prevTrack) {
+      playTrack(prevTrack, prevIndex);
+    }
+  };
+
+  const updateMediaPosition = () => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator) || !("setPositionState" in navigator.mediaSession)) return;
+    try {
+      let dur = 0;
+      let pos = 0;
+
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        dur = nativeAudioRef.current.duration || 0;
+        pos = nativeAudioRef.current.currentTime || 0;
+      } else if (ytPlayerRef.current && typeof ytPlayerRef.current.getDuration === "function") {
+        dur = ytPlayerRef.current.getDuration() || 0;
+        pos = ytPlayerRef.current.getCurrentTime() || 0;
+      }
+
+      if (dur > 0 && pos >= 0 && pos <= dur) {
+        navigator.mediaSession.setPositionState({
+          duration: dur,
+          playbackRate: 1,
+          position: pos,
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to set Media Session position state:", err);
+    }
+  };
+
+  const handleEnded = () => {
+    handleNext();
+  };
+
   const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
     setCurrentTime(time);
@@ -572,11 +1055,14 @@ export default function Player() {
     const target = e.target as HTMLInputElement;
     const time = parseFloat(target.value);
 
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
+    if (useNativeAudioRef.current && nativeAudioRef.current) {
+      nativeAudioRef.current.currentTime = time;
+    } else if (ytPlayerRef.current && typeof ytPlayerRef.current.seekTo === "function") {
+      ytPlayerRef.current.seekTo(time, true);
     }
 
     setCurrentTime(time);
+    updateMediaPosition();
     setIsSeeking(false);
   };
 
@@ -601,36 +1087,38 @@ export default function Player() {
 
   return (
     <div ref={playerRef} className="w-full flex flex-col gap-3.5 transition-all duration-300">
-      {/* Native HTML5 Audio Element with Visible Controls for Mobile Diagnostics */}
-      <div className="w-full flex justify-center px-4 py-1">
-        <audio
-          ref={audioRef}
-          preload="auto"
-          playsInline
-          controls
-          className="w-full max-w-md my-1 z-50 rounded-lg shadow-md"
-          onPlay={handleNativePlay}
-          onPause={handleNativePause}
-          onTimeUpdate={handleNativeTimeUpdate}
-          onLoadedMetadata={handleNativeLoadedMetadata}
-          onEnded={handleNativeEnded}
-          onError={handleNativeError}
-          onLoadStart={() => console.log("=== AUDIO EVENT: loadstart ===")}
-          onLoadedData={() => console.log("=== AUDIO EVENT: loadeddata ===")}
-          onCanPlay={() => console.log("=== AUDIO EVENT: canplay ===")}
-          onCanPlayThrough={() => console.log("=== AUDIO EVENT: canplaythrough ===")}
-          onWaiting={() => console.log("=== AUDIO EVENT: waiting ===")}
-          onStalled={() => console.log("=== AUDIO EVENT: stalled ===")}
-          onSuspend={() => console.log("=== AUDIO EVENT: suspend ===")}
-          onAbort={() => console.log("=== AUDIO EVENT: abort ===")}
-          onEmptied={() => console.log("=== AUDIO EVENT: emptied ===")}
-        />
-      </div>
-
-      {/* Hidden YouTube Iframe Container */}
+      {/* Hidden YouTube Iframe Container (visible but off-screen to prevent browser playback throttling) */}
       <div className="fixed -left-[9999px] top-0 w-[200px] h-[200px] opacity-0 pointer-events-none z-0">
         <div ref={ytContainerRef} />
       </div>
+
+      {/* Background Audio Keep-Alive Loop for Mobile Lock Screen & Bluetooth */}
+      <audio
+        ref={bgAudioRef}
+        src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAAA"
+        loop
+        className="hidden"
+      />
+
+      {/* Native Audio Element — primary playback engine for mobile background support */}
+      <audio
+        ref={(el) => {
+          nativeAudioRef.current = el;
+          if (typeof window !== "undefined" && el) {
+            (window as any).__lofiNativeAudio = el;
+          }
+        }}
+        className="hidden"
+        preload="auto"
+        onEnded={handleEnded}
+        onError={() => {
+          // If native audio errors out, fall back to YouTube iframe
+          if (useNativeAudioRef.current) {
+            console.warn("Native audio error, falling back to YouTube iframe");
+            useNativeAudioRef.current = false;
+          }
+        }}
+      />
 
       {/* ========================================================================= */}
       {/* EXPANDABLE HUSTLE CATALOG PANEL */}
@@ -698,6 +1186,7 @@ export default function Player() {
                   {/* Play All button for this category */}
                   <button
                     onClick={() => {
+                      // Filter tracks for this season
                       const seasonTracks = tracks.filter((t) =>
                         season === "all"
                           ? true
@@ -781,10 +1270,10 @@ export default function Player() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth="1.5"
-                    d="M9.172 9.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <span>No tracks match your search</span>
+                No matching tracks found
               </div>
             )}
           </div>
@@ -792,13 +1281,15 @@ export default function Player() {
       )}
 
       {/* ========================================================================= */}
-      {/* DESKTOP PLAYER (horizontal layout) */}
+      {/* DESKTOP PLAYER (pill layout) */}
       {/* ========================================================================= */}
-      <div className={`hidden sm:flex items-center gap-4 px-5 py-3.5 rounded-full w-full select-none ${glassClass}`}>
-        {/* Left Vinyl Icon */}
-        <div className="relative w-11 h-11 flex-shrink-0">
+      <div
+        className={`hidden sm:flex items-center gap-4 p-3 pr-6 rounded-full w-full ${glassClass}`}
+      >
+        {/* Spinning Vinyl */}
+        <div className="relative w-20 h-20 flex-shrink-0">
           <div
-            className="w-full h-full rounded-full bg-black border border-white/10 overflow-hidden shadow-md animate-vinyl-spin"
+            className="w-full h-full rounded-full bg-black border border-white/10 overflow-hidden shadow-lg animate-vinyl-spin"
             style={{
               animationPlayState: (isPlaying && !isLoadingTrack) ? "running" : "paused",
               backgroundImage: `url(${currentTrack.cover})`,
@@ -833,7 +1324,7 @@ export default function Player() {
               </p>
             </div>
 
-            {/* Transport Controls */}
+            {/* Transport Controls (positioned next to info) */}
             <div className="flex items-center gap-2 flex-shrink-0">
               {/* Shuffle */}
               <button
@@ -942,7 +1433,7 @@ export default function Player() {
 
           </div>
 
-          {/* Bottom Row: Full-width Seek Bar */}
+          {/* Bottom Row: Full-width Seek Bar (Timer + Progress Slider + Timer Row) */}
           <div className="flex items-center gap-3 w-full mt-1 select-none">
             <span className="text-[11px] text-white/50 font-mono tabular-nums flex-shrink-0">
               {formatTime(currentTime)}
@@ -950,12 +1441,15 @@ export default function Player() {
             
             {/* Progress Seek Bar */}
             <div className="relative flex-grow h-4 flex items-center group">
+              {/* Custom Track Rail */}
               <div className="absolute left-0 right-0 h-[3px] bg-white/15 rounded-full pointer-events-none">
+                {/* Highlight active progress fill */}
                 <div
                   className="h-full bg-rose-500 rounded-full shadow-[0_0_8px_#e11d48]"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
+              {/* Invisible Range Input Slider */}
               <input
                 type="range"
                 min={0}
@@ -1015,12 +1509,15 @@ export default function Player() {
 
         {/* Seek Bar */}
         <div className="relative w-full h-6 flex items-center group mb-2">
+          {/* Custom Track Rail */}
           <div className="absolute left-0 right-0 h-[3px] bg-white/15 rounded-full pointer-events-none">
+            {/* Highlight active progress fill */}
             <div
               className="h-full bg-rose-500 rounded-full shadow-[0_0_8px_#e11d48]"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
+          {/* Invisible Range Input Slider */}
           <input
             type="range"
             min={0}
@@ -1066,7 +1563,7 @@ export default function Player() {
           <button
             onClick={() => setIsCatalogOpen((prev) => !prev)}
             className={`p-3 rounded-full transition-all focus:outline-none active:scale-95 ${
-              isCatalogOpen ? "text-rose-400 bg-white/5" : "text-white/70 hover:text-white"
+              isCatalogOpen ? "text-rose-400" : "text-white/70 hover:text-white"
             }`}
             aria-label="Toggle Catalog"
           >
@@ -1075,57 +1572,57 @@ export default function Player() {
             </svg>
           </button>
 
-          {/* Previous Track */}
-          <button
-            onClick={handlePrev}
-            className="p-3 text-white/70 hover:text-white active:scale-95 transition-all focus:outline-none"
-            aria-label="Previous Track"
-          >
-            <svg className="w-[22px] h-[22px] fill-current" viewBox="0 0 24 24">
-              <path d="M6 6h2v12H6zm3.5 6L18 6v12z" />
-            </svg>
-          </button>
-
-          {/* Play/Pause */}
-          <button
-            onClick={handlePlayPause}
-            className="w-14 h-14 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/20 hover:scale-105 active:scale-95 text-white transition-all focus:outline-none shadow-lg"
-            aria-label={isPlaying ? "Pause" : "Play"}
-          >
-            {isPlaying ? (
-              <svg className="w-[24px] h-[24px] fill-current" viewBox="0 0 24 24">
-                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          {/* Audio Transport */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handlePrev}
+              className="p-3 text-white/70 hover:text-white active:scale-95 transition-all focus:outline-none"
+              aria-label="Previous Track"
+            >
+              <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                <path d="M6 6h2v12H6zm3.5 6L18 6v12z" />
               </svg>
-            ) : (
-              <svg className="w-[24px] h-[24px] fill-current translate-x-[1px]" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
+            </button>
+
+            <button
+              onClick={handlePlayPause}
+              className="w-14 h-14 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/20 hover:scale-105 active:scale-95 text-white transition-all focus:outline-none shadow-md"
+              aria-label={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? (
+                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6 fill-current translate-x-[1px]" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </button>
+
+            <button
+              onClick={handleNext}
+              className="p-3 text-white/70 hover:text-white active:scale-95 transition-all focus:outline-none"
+              aria-label="Next Track"
+            >
+              <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                <path d="M6 18l8.5-6L6 6zm9-12v12h2V6z" />
               </svg>
-            )}
-          </button>
+            </button>
+          </div>
 
-          {/* Next Track */}
-          <button
-            onClick={handleNext}
-            className="p-3 text-white/70 hover:text-white active:scale-95 transition-all focus:outline-none"
-            aria-label="Next Track"
-          >
-            <svg className="w-[22px] h-[22px] fill-current" viewBox="0 0 24 24">
-              <path d="M6 18l8.5-6L6 6zm9-12v12h2V6z" />
-            </svg>
-          </button>
-
-          {/* Volume Mute Toggle */}
+          {/* Mute/Volume Toggle */}
           <button
             onClick={() => setIsMuted(!isMuted)}
             className="p-3 text-white/70 hover:text-white active:scale-95 transition-all focus:outline-none"
             aria-label="Mute/Unmute"
           >
             {isMuted || volume === 0 ? (
-              <svg className="w-[20px] h-[20px] fill-current" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                 <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.21.05-.42.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.03c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
               </svg>
             ) : (
-              <svg className="w-[20px] h-[20px] fill-current" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                 <path d="M3 9v6h4l5 5V4L9 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
               </svg>
             )}

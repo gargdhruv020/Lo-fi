@@ -254,17 +254,6 @@ const favouritesList: { title: string; artist: string }[] = [
   { title: "Nazm Nazm (Lofi Flip)", artist: "Bareilly Ki Barfi" },
 ];
 
-const audioStreamPool = [
-  "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3",
-  "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3?filename=chill-lofi-song-8444.mp3",
-  "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=lofi-chill-medium-version-159456.mp3",
-  "https://cdn.pixabay.com/download/audio/2022/11/06/audio_c0c326d9ef.mp3?filename=good-night-lofi-cozy-chill-hop-125026.mp3",
-  "https://cdn.pixabay.com/download/audio/2022/01/26/audio_d0c6b0394d.mp3?filename=sweet-lofi-hip-hop-159458.mp3",
-  "https://cdn.pixabay.com/download/audio/2023/04/17/audio_8dfb8e7efb.mp3?filename=starlight-lofi-chill-hop-145396.mp3",
-  "https://cdn.pixabay.com/download/audio/2022/10/14/audio_9939f7336f.mp3?filename=lofi-alarm-clock-122394.mp3",
-  "https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3?filename=lofi-study-chill-hop-115383.mp3",
-];
-
 export const getHustleCatalog = (): CatalogTrack[] => {
   const catalog: CatalogTrack[] = [];
   rawSongsData.forEach((group) => {
@@ -273,7 +262,6 @@ export const getHustleCatalog = (): CatalogTrack[] => {
       const compositeKey = `${title}-${group.artist}`;
       
       const coverIdx = getHash(compositeKey, coverPool.length);
-      const audioIdx = getHash(compositeKey, audioStreamPool.length);
       
       const isFavourite = favouritesList.some(
         (fav) =>
@@ -286,7 +274,7 @@ export const getHustleCatalog = (): CatalogTrack[] => {
         title,
         artist: group.artist,
         season: group.season,
-        url: audioStreamPool[audioIdx],
+        url: "",
         cover: coverPool[coverIdx],
         isFavourite,
       });

@@ -105,10 +105,7 @@ export async function GET(request: NextRequest) {
     // Try to get a direct audio URL from Invidious (for mobile background playback)
     let audioUrl: string | null = null;
     try {
-      const rawAudioUrl = await getAudioUrl(videoId);
-      if (rawAudioUrl) {
-        audioUrl = `/api/stream?url=${encodeURIComponent(rawAudioUrl)}`;
-      }
+      audioUrl = await getAudioUrl(videoId);
     } catch {
       // Non-critical: audioUrl stays null, client falls back to YouTube iframe
     }
