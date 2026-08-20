@@ -46,6 +46,7 @@ export default function Player() {
   const isSwappingSource = useRef(false);
   const activeTrackIdRef = useRef(currentTrackId);
   const ytPlayerRef = useRef<any>(null);
+  const ytContainerRef = useRef<HTMLDivElement | null>(null);
   const timeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load YouTube Iframe Player API script dynamically on mount
@@ -181,9 +182,9 @@ export default function Player() {
   // Centralized playTrack method to guarantee synchronous playback trigger within the click context
   // Centralized playTrack method to guarantee direct, clean playback of the requested track from start
   const initYoutubePlayer = (initialVideoId: string) => {
-    if (typeof window === "undefined" || !(window as any).YT || !(window as any).YT.Player) return;
+    if (typeof window === "undefined" || !(window as any).YT || !(window as any).YT.Player || !ytContainerRef.current) return;
 
-    ytPlayerRef.current = new (window as any).YT.Player("youtube-player", {
+    ytPlayerRef.current = new (window as any).YT.Player(ytContainerRef.current, {
       height: "200",
       width: "200",
       videoId: initialVideoId,
@@ -238,7 +239,29 @@ export default function Player() {
     setIsPlaying(false);
     stopTimeSyncInterval();
 
-    // Fetch the YouTube Video ID
+    // 1. Synchronously initialize or activate the player with a loading video ID
+    // to claim the user gesture permission token immediately in the click stack!
+    if (!ytPlayerRef.current) {
+      if ((window as any).YT && (window as any).YT.Player) {
+        initYoutubePlayer("jfKfPfyJRdk"); // load default lo-fi track to claim gesture
+      } else {
+        // Wait for YT script and initialize
+        const checkYT = setInterval(() => {
+          if ((window as any).YT && (window as any).YT.Player) {
+            clearInterval(checkYT);
+            initYoutubePlayer("jfKfPfyJRdk");
+          }
+        }, 50);
+      }
+    } else {
+      // Secure the gesture by calling play/pause on the existing player synchronously
+      try {
+        ytPlayerRef.current.playVideo();
+        ytPlayerRef.current.pauseVideo();
+      } catch (e) {}
+    }
+
+    // 2. Fetch the YouTube Video ID
     const queryParams = new URLSearchParams({
       id: track.id,
       title: track.title,
@@ -266,24 +289,12 @@ export default function Player() {
               setIsLoadingTrack(false);
               startTimeSyncInterval();
             } else {
-              console.warn("YouTube player not ready, retrying in 200ms...");
-              setTimeout(playVideo, 200);
+              console.warn("YouTube player not ready, retrying in 100ms...");
+              setTimeout(playVideo, 100);
             }
           };
 
-          if (!(window as any).YT || !(window as any).YT.Player) {
-            console.warn("YT API not loaded yet, waiting...");
-            const checkYT = setInterval(() => {
-              if ((window as any).YT && (window as any).YT.Player) {
-                clearInterval(checkYT);
-                initYoutubePlayer(data.videoId);
-              }
-            }, 100);
-          } else if (!ytPlayerRef.current) {
-            initYoutubePlayer(data.videoId);
-          } else {
-            playVideo();
-          }
+          playVideo();
         }
       })
       .catch((downloaderErr) => {
@@ -559,7 +570,7 @@ export default function Player() {
     <div ref={playerRef} className="w-full flex flex-col gap-3.5 transition-all duration-300">
       {/* Hidden YouTube Iframe Container (visible but off-screen to prevent browser playback throttling) */}
       <div className="fixed -left-[9999px] top-0 w-[200px] h-[200px] opacity-0 pointer-events-none z-0">
-        <div id="youtube-player" />
+        <div ref={ytContainerRef} />
       </div>
 
       {/* ========================================================================= */}
