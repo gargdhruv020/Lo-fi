@@ -360,8 +360,15 @@ export default function Player() {
         const audio = nativeAudioRef.current;
         if (!audio.paused && !isSeeking) {
           setCurrentTime(audio.currentTime || 0);
-          setDuration(audio.duration || 0);
+          if (audio.duration && !isNaN(audio.duration) && audio.duration > 0) {
+            setDuration(audio.duration);
+          }
           updateMediaPosition();
+
+          if (audio.ended || (audio.duration > 0 && audio.currentTime >= audio.duration - 0.5)) {
+            stopTimeSyncInterval();
+            handleNext();
+          }
         }
       } else {
         // YouTube iframe is the active engine
@@ -370,7 +377,9 @@ export default function Player() {
           const state = player.getPlayerState();
           if (state === 1 && !isSeeking) {
             setCurrentTime(player.getCurrentTime() || 0);
-            setDuration(player.getDuration() || 0);
+            if (player.getDuration() && !isNaN(player.getDuration()) && player.getDuration() > 0) {
+              setDuration(player.getDuration());
+            }
             updateMediaPosition();
           }
         }
@@ -460,26 +469,7 @@ export default function Player() {
     if (typeof window !== "undefined") {
       const audioService = getAudioService();
       if (audioService.audioElement) {
-        const audio = audioService.audioElement;
-        nativeAudioRef.current = audio;
-
-        const handleEndedEvent = () => {
-          stopTimeSyncInterval();
-          handleNext();
-        };
-
-        const handleErrorEvent = () => {
-          console.warn("Native audio error encountered, advancing to next track.");
-          handleNext();
-        };
-
-        audio.addEventListener("ended", handleEndedEvent);
-        audio.addEventListener("error", handleErrorEvent);
-
-        return () => {
-          audio.removeEventListener("ended", handleEndedEvent);
-          audio.removeEventListener("error", handleErrorEvent);
-        };
+        nativeAudioRef.current = audioService.audioElement;
       }
     }
   }, [catalog]);
