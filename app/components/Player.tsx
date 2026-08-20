@@ -144,85 +144,56 @@ export default function Player() {
   };
 
   // Centralized playTrack method to guarantee synchronous playback trigger within the click context
+  // Centralized playTrack method to guarantee direct, clean playback of the requested track from start
   const playTrack = (track: CatalogTrack) => {
     if (!track) return;
 
     setCurrentTrackId(track.id);
-    setIsPlaying(true);
+    setIsLoadingTrack(true);
+    setIsPlaying(false);
 
     const audio = audioRef.current;
     if (!audio) return;
 
-    const isDownloaded = downloadedTracks.has(track.id);
-    const localUrl = `/audio/${track.id}.m4a`;
+    // Synchronously activate the audio element within the user click gesture stack
+    // to secure browser playback permissions for the upcoming async URL swap
+    audio.play()
+      .then(() => audio.pause())
+      .catch(() => {});
 
-    if (isDownloaded) {
-      // 1. Play local file synchronously (user event handler context) - guaranteed to succeed!
-      setIsLoadingTrack(false);
-      isSwappingSource.current = true;
-      audio.src = localUrl;
-      audio.load();
-      audio.play()
-        .then(() => { isSwappingSource.current = false; })
-        .catch((playErr) => {
-          console.warn("Local play failed:", playErr);
-          isSwappingSource.current = false;
-        });
-    } else {
-      // 2. Play fallback generic lofi loop synchronously (user event handler context) - guaranteed to succeed!
-      setIsLoadingTrack(true);
-      const trackIdx = catalog.findIndex((t) => t.id === track.id);
-      const fallbackIdx = ((trackIdx >= 0 ? trackIdx : 0) % 6) + 1;
-      isSwappingSource.current = true;
-      audio.src = `/audio/song${fallbackIdx}.mp3`;
-      audio.load();
-      audio.play()
-        .then(() => { isSwappingSource.current = false; })
-        .catch((playErr) => {
-          console.warn("Fallback play failed:", playErr);
-          isSwappingSource.current = false;
-        });
+    // Fetch the direct streaming URL
+    const queryParams = new URLSearchParams({
+      id: track.id,
+      title: track.title,
+      artist: track.artist,
+      season: String(track.season),
+    });
 
-      // 3. Download the track on demand in the background
-      const queryParams = new URLSearchParams({
-        id: track.id,
-        title: track.title,
-        artist: track.artist,
-        season: String(track.season),
-      });
-
-      fetch(`/api/play?${queryParams.toString()}`)
-        .then((res) => res.json())
-        .then((data) => {
-          // Add track ID to downloadedTracks state and cache
-          setDownloadedTracks((prev) => {
-            const nextSet = new Set(prev);
-            nextSet.add(track.id);
-            return nextSet;
-          });
-
-          // Swap sources seamlessly if we are still playing the fallback loop for this track and user is still on this track
-          if (activeTrackIdRef.current === track.id && audio.src.includes("/audio/song")) {
-            // If the returned URL is a fallback, do NOT swap to prevent browser autoplay blocks!
-            if (data.url.includes("/audio/song")) {
+    fetch(`/api/play?${queryParams.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        // Swap sources and play ONLY if the user is still on this track
+        if (activeTrackIdRef.current === track.id) {
+          isSwappingSource.current = true;
+          audio.src = data.url;
+          audio.load();
+          audio.play()
+            .then(() => {
+              isSwappingSource.current = false;
+              setIsPlaying(true);
               setIsLoadingTrack(false);
-              return;
-            }
-            const currentPlaybackTime = audio.currentTime;
-            isSwappingSource.current = true;
-            audio.src = data.url;
-            audio.load();
-            audio.currentTime = currentPlaybackTime;
-            audio.play()
-              .then(() => { isSwappingSource.current = false; })
-              .catch(() => { isSwappingSource.current = false; });
-          }
-        })
-        .catch((downloaderErr) => console.error("Downloader API failed:", downloaderErr))
-        .finally(() => {
-          setIsLoadingTrack(false);
-        });
-    }
+            })
+            .catch((playErr) => {
+              console.warn("Direct stream playback failed:", playErr);
+              isSwappingSource.current = false;
+              setIsLoadingTrack(false);
+            });
+        }
+      })
+      .catch((downloaderErr) => {
+        console.error("Downloader API failed:", downloaderErr);
+        setIsLoadingTrack(false);
+      });
   };
 
   // Predictive prefetching for next and previous tracks in the background
