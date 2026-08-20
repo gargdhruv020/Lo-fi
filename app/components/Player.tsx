@@ -45,6 +45,11 @@ export default function Player() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playerRef = useRef<HTMLDivElement | null>(null);
   const isSwappingSource = useRef(false);
+  const activeTrackIdRef = useRef(currentTrackId);
+
+  useEffect(() => {
+    activeTrackIdRef.current = currentTrackId;
+  }, [currentTrackId]);
 
   // Randomize track order and starting track on client mount (preventing SSR hydration mismatches)
   useEffect(() => {
@@ -196,8 +201,8 @@ export default function Player() {
             return nextSet;
           });
 
-          // Swap sources seamlessly if we are still playing the fallback loop for this track
-          if (audio.src.includes("/audio/song")) {
+          // Swap sources seamlessly if we are still playing the fallback loop for this track and user is still on this track
+          if (activeTrackIdRef.current === track.id && audio.src.includes("/audio/song")) {
             const currentPlaybackTime = audio.currentTime;
             isSwappingSource.current = true;
             audio.src = data.url;
