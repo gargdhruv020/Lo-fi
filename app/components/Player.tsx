@@ -415,8 +415,21 @@ export default function Player() {
 
         try {
           await audio.play();
-        } catch (err) {
-          console.error("Playback failed for audio stream:", err);
+          console.log("AUDIO PLAY SUCCESS", {
+            src: audio.src,
+            currentSrc: audio.currentSrc,
+            readyState: audio.readyState,
+            networkState: audio.networkState,
+            paused: audio.paused,
+            duration: audio.duration,
+          });
+        } catch (err: any) {
+          console.error("AUDIO PLAY FAILED", {
+            name: err?.name,
+            message: err?.message,
+            src: audio.src,
+            readyState: audio.readyState,
+          });
           setIsLoadingTrack(false);
         }
       } else {
@@ -438,8 +451,9 @@ export default function Player() {
         } else {
           try {
             await audio.play();
-          } catch (err) {
-            console.error("Playback failed on play click:", err);
+            console.log("AUDIO PLAY TOGGLE SUCCESS", { src: audio.src, readyState: audio.readyState });
+          } catch (err: any) {
+            console.error("AUDIO PLAY TOGGLE FAILED", { name: err?.name, message: err?.message, src: audio.src });
           }
         }
       } else {

@@ -49,8 +49,8 @@ export default function PullToRefresh() {
         setPullDistance(dampenedDistance);
         setIsThresholdMet(dampenedDistance >= THRESHOLD);
 
-        // Prevent default overscroll to stop browser fights
-        if (e.cancelable && rawDiff > 10) {
+        // Prevent default overscroll only on significant intentional pull down (>50px) to preserve user gesture tokens for audio playback
+        if (e.cancelable && rawDiff > 50) {
           e.preventDefault();
         }
       } else {
