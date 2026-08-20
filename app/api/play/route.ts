@@ -36,6 +36,57 @@ const searchYoutube = (query: string): Promise<string> => {
   });
 };
 
+// Invidious instances to try for direct audio stream URLs (itag 140 = m4a 128kbps audio)
+const INVIDIOUS_INSTANCES = [
+  "inv.nadeko.net",
+  "invidious.nerdvpn.de",
+  "invidious.jing.rocks",
+  "yewtu.be",
+  "invidious.privacydev.net",
+  "invidious.projectsegfau.lt",
+];
+
+// Try to get a direct audio stream URL from Invidious instances
+const getAudioUrl = async (videoId: string): Promise<string | null> => {
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const apiUrl = `https://${instance}/api/v1/videos/${videoId}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+
+      const res = await fetch(apiUrl, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) continue;
+
+      const data = await res.json();
+
+      // Look for audio-only adaptive format (itag 140 = m4a 128kbps)
+      if (data.adaptiveFormats && Array.isArray(data.adaptiveFormats)) {
+        // Prefer itag 140 (m4a 128kbps), then any audio format
+        const audioFormat =
+          data.adaptiveFormats.find((f: any) => f.itag === "140" || f.itag === 140) ||
+          data.adaptiveFormats.find((f: any) =>
+            f.type?.startsWith("audio/") || f.encoding === "aac"
+          );
+
+        if (audioFormat && audioFormat.url) {
+          return audioFormat.url;
+        }
+      }
+    } catch {
+      // This instance failed, try next
+      continue;
+    }
+  }
+  return null;
+};
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
@@ -50,11 +101,18 @@ export async function GET(request: NextRequest) {
 
   try {
     const videoId = await searchYoutube(searchQuery);
-    return NextResponse.json({ videoId, status: "ready" });
+
+    // Try to get a direct audio URL from Invidious (for mobile background playback)
+    let audioUrl: string | null = null;
+    try {
+      audioUrl = await getAudioUrl(videoId);
+    } catch {
+      // Non-critical: audioUrl stays null, client falls back to YouTube iframe
+    }
+
+    return NextResponse.json({ videoId, audioUrl, status: "ready" });
   } catch (error: any) {
     console.error(`YouTube search failed for ${searchQuery}:`, error.message);
-    // Return a default fallback video ID if search fails
-    // This is a relaxing lo-fi audio fallback video ID
-    return NextResponse.json({ videoId: "jfKfPfyJRdk", status: "fallback", error: error.message });
+    return NextResponse.json({ videoId: "jfKfPfyJRdk", audioUrl: null, status: "fallback", error: error.message });
   }
 }
