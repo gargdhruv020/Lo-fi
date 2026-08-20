@@ -980,6 +980,7 @@ export default function Player() {
   };
 
   const handleNext = () => {
+    getAudioService().affirmPlaybackState(true);
     const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
     if (activePlaylist.length === 0) return;
     const nextIndex = (currentIndexRef.current + 1) % activePlaylist.length;
@@ -990,6 +991,7 @@ export default function Player() {
   };
 
   const handlePrev = () => {
+    getAudioService().affirmPlaybackState(true);
     const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
     if (activePlaylist.length === 0) return;
     const prevIndex = (currentIndexRef.current - 1 + activePlaylist.length) % activePlaylist.length;
