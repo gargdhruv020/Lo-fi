@@ -612,19 +612,10 @@ export default function Player() {
     setCurrentTrackId(track.id);
     activeTrackIdRef.current = track.id;
     setIsLoadingTrack(true);
-    setIsPlaying(false);
-    stopTimeSyncInterval();
-    stopNativeAudio();
-    bgAudioRef.current?.pause();
 
-    // Secure browser user-gesture token by executing a play command synchronously
-    const player = ytPlayerRef.current;
-    if (player && typeof player.playVideo === "function") {
-      try {
-        player.playVideo();
-        player.pauseVideo();
-      } catch (e) {}
-    }
+    // Keep MediaSession playbackState affirmed as 'playing' during track transitions to prevent notification collapse
+    getAudioService().affirmPlaybackState(true);
+    stopTimeSyncInterval();
 
     // Synchronously prime / unlock persistent HTML5 audio element on first user gesture
     getAudioService().primeUserGesture();
