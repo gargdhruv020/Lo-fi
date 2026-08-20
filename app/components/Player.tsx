@@ -28,6 +28,7 @@ export default function Player() {
     const defaultCatalog = getHustleCatalog();
     return defaultCatalog.length > 0 ? defaultCatalog[0].id : "";
   });
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -45,6 +46,8 @@ export default function Player() {
   const playerRef = useRef<HTMLDivElement | null>(null);
   const isSwappingSource = useRef(false);
   const activeTrackIdRef = useRef(currentTrackId);
+  const currentIndexRef = useRef<number>(0);
+  const tracksRef = useRef<CatalogTrack[]>(catalog);
   const ytPlayerRef = useRef<any>(null);
   const ytContainerRef = useRef<HTMLDivElement | null>(null);
   const timeIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -143,18 +146,10 @@ export default function Player() {
       handlePlayPause();
     });
     navigator.mediaSession.setActionHandler("previoustrack", () => {
-      if (tracks.length > 0) {
-        const prevId = getSiblingTrackId("prev");
-        const prevTrack = tracks.find((t) => t.id === prevId);
-        if (prevTrack) playTrack(prevTrack);
-      }
+      handlePrev();
     });
     navigator.mediaSession.setActionHandler("nexttrack", () => {
-      if (tracks.length > 0) {
-        const nextId = getSiblingTrackId("next");
-        const nextTrack = tracks.find((t) => t.id === nextId);
-        if (nextTrack) playTrack(nextTrack);
-      }
+      handleNext();
     });
     navigator.mediaSession.setActionHandler("seekbackward", () => {
       if (useNativeAudioRef.current && nativeAudioRef.current) {
@@ -229,13 +224,24 @@ export default function Player() {
     activeTrackIdRef.current = currentTrackId;
   }, [currentTrackId]);
 
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  useEffect(() => {
+    tracksRef.current = tracks;
+  }, [tracks]);
+
   // Initialize tracks and starting track on client mount (preventing SSR hydration mismatches)
   useEffect(() => {
     // Defer state updates to next tick to avoid synchronous cascading renders linter warning
     const timer = setTimeout(() => {
       setTracks(catalog);
+      tracksRef.current = catalog;
       if (catalog.length > 0) {
         setCurrentTrackId(catalog[0].id);
+        setCurrentIndex(0);
+        currentIndexRef.current = 0;
       }
     }, 0);
 
@@ -275,32 +281,6 @@ export default function Player() {
       return matchesSeason && matchesSearch;
     });
   }, [tracks, activeSeason, searchQuery]);
-
-  // Find index in the CURRENT filtered list or fallback to main catalog
-  const getSiblingTrackId = (direction: "next" | "prev"): string => {
-    const playlistToUse = filteredTracks.length > 0 ? filteredTracks : tracks;
-    let currentIndex = playlistToUse.findIndex((t) => t.id === currentTrack.id);
-
-    // If the active track is not in the active filtered view, navigate using the full catalog
-    if (currentIndex === -1) {
-      currentIndex = tracks.findIndex((t) => t.id === currentTrack.id);
-      if (currentIndex === -1) return tracks[0]?.id || "";
-
-      if (direction === "next") {
-        return tracks[(currentIndex + 1) % tracks.length].id;
-      } else {
-        return tracks[(currentIndex - 1 + tracks.length) % tracks.length].id;
-      }
-    }
-
-    if (direction === "next") {
-      const nextIndex = (currentIndex + 1) % playlistToUse.length;
-      return playlistToUse[nextIndex].id;
-    } else {
-      const prevIndex = (currentIndex - 1 + playlistToUse.length) % playlistToUse.length;
-      return playlistToUse[prevIndex].id;
-    }
-  };
 
   // Centralized playTrack method to guarantee synchronous playback trigger within the click context
   // Centralized playTrack method to guarantee direct, clean playback of the requested track from start
@@ -434,9 +414,15 @@ export default function Player() {
   };
 
   // Centralized playTrack method — tries native audio for mobile background, falls back to YouTube iframe
-  const playTrack = (track: CatalogTrack) => {
+  const playTrack = (track: CatalogTrack, explicitIndex?: number) => {
     if (!track) return;
 
+    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+    const idx = explicitIndex !== undefined ? explicitIndex : activePlaylist.findIndex((t) => t.id === track.id);
+    const validIndex = idx !== -1 ? idx : 0;
+
+    setCurrentIndex(validIndex);
+    currentIndexRef.current = validIndex;
     setCurrentTrackId(track.id);
     activeTrackIdRef.current = track.id;
     setIsLoadingTrack(true);
@@ -541,19 +527,21 @@ export default function Player() {
 
     // Wait 1.5 seconds of continuous playback before prefetching (to avoid spamming skips)
     const prefetchTimer = setTimeout(() => {
-      const nextId = getSiblingTrackId("next");
-      const prevId = getSiblingTrackId("prev");
-      
-      const nextTrack = tracks.find((t) => t.id === nextId);
-      const prevTrack = tracks.find((t) => t.id === prevId);
-      
+      const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+      if (activePlaylist.length === 0) return;
+
+      const nextIndex = (currentIndexRef.current + 1) % activePlaylist.length;
+      const prevIndex = (currentIndexRef.current - 1 + activePlaylist.length) % activePlaylist.length;
+
+      const nextTrack = activePlaylist[nextIndex];
+      const prevTrack = activePlaylist[prevIndex];
+
       if (nextTrack) prefetchTrack(nextTrack);
       if (prevTrack) prefetchTrack(prevTrack);
     }, 1500);
 
     return () => clearTimeout(prefetchTimer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrackId, tracks, filteredTracks]);
+  }, [currentTrackId, tracks, catalog]);
 
   // Global keyboard shortcut: Spacebar to toggle Play/Pause
   useEffect(() => {
@@ -634,37 +622,41 @@ export default function Player() {
       handlePlayPause();
     });
     navigator.mediaSession.setActionHandler("previoustrack", () => {
-      if (tracks.length > 0) {
-        const prevId = getSiblingTrackId("prev");
-        const prevTrack = tracks.find((t) => t.id === prevId);
-        if (prevTrack) playTrack(prevTrack);
-      }
+      handlePrev();
     });
     navigator.mediaSession.setActionHandler("nexttrack", () => {
-      if (tracks.length > 0) {
-        const nextId = getSiblingTrackId("next");
-        const nextTrack = tracks.find((t) => t.id === nextId);
-        if (nextTrack) playTrack(nextTrack);
-      }
+      handleNext();
     });
     navigator.mediaSession.setActionHandler("seekbackward", () => {
-      const player = ytPlayerRef.current;
-      if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
-        const newTime = Math.max(0, player.getCurrentTime() - 10);
-        player.seekTo(newTime, true);
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        const newTime = Math.max(0, nativeAudioRef.current.currentTime - 10);
+        nativeAudioRef.current.currentTime = newTime;
         setCurrentTime(newTime);
+      } else {
+        const player = ytPlayerRef.current;
+        if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
+          const newTime = Math.max(0, player.getCurrentTime() - 10);
+          player.seekTo(newTime, true);
+          setCurrentTime(newTime);
+        }
       }
     });
     navigator.mediaSession.setActionHandler("seekforward", () => {
-      const player = ytPlayerRef.current;
-      if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
-        const newTime = Math.min(player.getDuration() || 0, player.getCurrentTime() + 10);
-        player.seekTo(newTime, true);
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        const newTime = Math.min(nativeAudioRef.current.duration || 0, nativeAudioRef.current.currentTime + 10);
+        nativeAudioRef.current.currentTime = newTime;
         setCurrentTime(newTime);
+      } else {
+        const player = ytPlayerRef.current;
+        if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
+          const newTime = Math.min(player.getDuration() || 0, player.getCurrentTime() + 10);
+          player.seekTo(newTime, true);
+          setCurrentTime(newTime);
+        }
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrackId, currentTrack, tracks, filteredTracks]);
+  }, [currentTrackId, currentTrack, tracks]);
 
   const handleAudioError = () => {
     console.warn("Audio playback encountered an error, skipping to next track.");
@@ -730,26 +722,43 @@ export default function Player() {
     if (isShuffled) {
       // Turn off shuffle: restore original catalog order
       setTracks(catalog);
+      tracksRef.current = catalog;
       setIsShuffled(false);
+      const newIndex = catalog.findIndex((t) => t.id === currentTrackId);
+      const safeIndex = newIndex !== -1 ? newIndex : 0;
+      setCurrentIndex(safeIndex);
+      currentIndexRef.current = safeIndex;
     } else {
       // Turn on shuffle: randomize the track list
-      setTracks(shuffleArray(tracks));
+      const shuffled = shuffleArray(tracks);
+      setTracks(shuffled);
+      tracksRef.current = shuffled;
       setIsShuffled(true);
+      const newIndex = shuffled.findIndex((t) => t.id === currentTrackId);
+      const safeIndex = newIndex !== -1 ? newIndex : 0;
+      setCurrentIndex(safeIndex);
+      currentIndexRef.current = safeIndex;
     }
   };
 
   const handleNext = () => {
-    if (tracks.length === 0) return;
-    const nextId = getSiblingTrackId("next");
-    const nextTrack = tracks.find((t) => t.id === nextId);
-    if (nextTrack) playTrack(nextTrack);
+    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+    if (activePlaylist.length === 0) return;
+    const nextIndex = (currentIndexRef.current + 1) % activePlaylist.length;
+    const nextTrack = activePlaylist[nextIndex];
+    if (nextTrack) {
+      playTrack(nextTrack, nextIndex);
+    }
   };
 
   const handlePrev = () => {
-    if (tracks.length === 0) return;
-    const prevId = getSiblingTrackId("prev");
-    const prevTrack = tracks.find((t) => t.id === prevId);
-    if (prevTrack) playTrack(prevTrack);
+    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+    if (activePlaylist.length === 0) return;
+    const prevIndex = (currentIndexRef.current - 1 + activePlaylist.length) % activePlaylist.length;
+    const prevTrack = activePlaylist[prevIndex];
+    if (prevTrack) {
+      playTrack(prevTrack, prevIndex);
+    }
   };
 
   const updateMediaPosition = () => {
