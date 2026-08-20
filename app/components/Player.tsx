@@ -104,7 +104,7 @@ export default function Player() {
     }
   };
 
-  // Web Audio silent processing node — keeps mobile audio graph active during mobile backgrounding
+  // Web Audio Master Gain / Low-frequency Oscillator Stream — keeps AudioContext state strictly locked to 'running'
   const startSilentAudioNode = () => {
     if (typeof window === "undefined") return;
     try {
@@ -112,17 +112,23 @@ export default function Player() {
       const ctx = audioContextRef.current;
       if (!ctx) return;
 
+      if (ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
+
       if (!silentNodeRef.current) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        gain.gain.value = 0.0001; // Inaudible gain
+        osc.type = "sine";
+        osc.frequency.value = 50; // Continuous 50Hz low-frequency stream
+        gain.gain.value = 0.0001; // Silent inaudible gain
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();
         silentNodeRef.current = osc;
       }
     } catch (e) {
-      console.warn("Failed to start Web Audio silent processing node:", e);
+      console.warn("Failed to start Web Audio master stream:", e);
     }
   };
 
@@ -206,6 +212,7 @@ export default function Player() {
     if (typeof window === "undefined" || !("mediaSession" in navigator) || !currentTrack) return;
 
     (window as any).__customTrackTitle = currentTrack.title;
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
 
     // Force our metadata to override the YouTube iframe's metadata
     navigator.mediaSession.metadata = new MediaMetadata({
