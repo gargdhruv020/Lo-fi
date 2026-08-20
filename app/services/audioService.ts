@@ -2,7 +2,9 @@
 
 class AudioService {
   private static instance: AudioService | null = null;
-  public audioElement: HTMLAudioElement | null = null;
+  public audioA: HTMLAudioElement | null = null;
+  public audioB: HTMLAudioElement | null = null;
+  public activeSlot: "A" | "B" = "A";
   public bgAudioElement: HTMLAudioElement | null = null;
   public audioContext: AudioContext | null = null;
   public wakeLock: any = null;
@@ -13,16 +15,26 @@ class AudioService {
   private constructor() {
     if (typeof window === "undefined") return;
 
-    // 1. Global Audio Service Singleton — persistent DOM audio node that never unmounts
-    if (!(window as any).__lofiAudioSingleton) {
-      const audio = document.createElement("audio");
-      audio.preload = "auto";
-      audio.crossOrigin = "anonymous";
-      audio.className = "hidden";
-      document.body.appendChild(audio);
-      (window as any).__lofiAudioSingleton = audio;
+    // 1. Dual Audio Instance Setup — persistent audioA and audioB in memory
+    if (!(window as any).__lofiAudioA) {
+      const elA = document.createElement("audio");
+      elA.preload = "auto";
+      elA.crossOrigin = "anonymous";
+      elA.className = "hidden";
+      document.body.appendChild(elA);
+      (window as any).__lofiAudioA = elA;
     }
-    this.audioElement = (window as any).__lofiAudioSingleton;
+    this.audioA = (window as any).__lofiAudioA;
+
+    if (!(window as any).__lofiAudioB) {
+      const elB = document.createElement("audio");
+      elB.preload = "auto";
+      elB.crossOrigin = "anonymous";
+      elB.className = "hidden";
+      document.body.appendChild(elB);
+      (window as any).__lofiAudioB = elB;
+    }
+    this.audioB = (window as any).__lofiAudioB;
 
     if (!(window as any).__lofiBgAudioSingleton) {
       const bgAudio = document.createElement("audio");
@@ -56,6 +68,84 @@ class AudioService {
       AudioService.instance = new AudioService();
     }
     return AudioService.instance;
+  }
+
+  public get activeAudio(): HTMLAudioElement | null {
+    return this.activeSlot === "A" ? this.audioA : this.audioB;
+  }
+
+  public get inactiveAudio(): HTMLAudioElement | null {
+    return this.activeSlot === "A" ? this.audioB : this.audioA;
+  }
+
+  // Legacy fallback accessor for backwards compatibility
+  public get audioElement(): HTMLAudioElement | null {
+    return this.activeAudio;
+  }
+
+  // 2. Non-Destructive Source Loading & Dual-Audio Buffer Swap
+  public swapAndPlay(
+    newUrl: string,
+    volume: number = 0.8,
+    isMuted: boolean = false,
+    initialTime?: number
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const targetAudio = this.inactiveAudio;
+      const currentAudio = this.activeAudio;
+
+      if (!targetAudio) {
+        reject("No target audio element available");
+        return;
+      }
+
+      // Load new source into INACTIVE audio element while current is still active
+      targetAudio.src = newUrl;
+      targetAudio.volume = isMuted ? 0 : volume;
+      targetAudio.load();
+
+      if (typeof initialTime === "number" && initialTime > 0) {
+        try {
+          targetAudio.currentTime = initialTime;
+        } catch (e) {}
+      }
+
+      const playPromise = targetAudio.play();
+      if (playPromise) {
+        playPromise
+          .then(() => {
+            // Swap active slot pointer seamlessly once target audio starts playing
+            this.activeSlot = this.activeSlot === "A" ? "B" : "A";
+
+            // Non-destructively pause old audio WITHOUT clearing .src = ""
+            if (currentAudio && !currentAudio.paused) {
+              currentAudio.pause();
+            }
+
+            this.setPlaybackState(true);
+            resolve();
+          })
+          .catch((err) => {
+            console.warn("Dual-audio swap play failed:", err);
+            reject(err);
+          });
+      } else {
+        this.activeSlot = this.activeSlot === "A" ? "B" : "A";
+        if (currentAudio && !currentAudio.paused) {
+          currentAudio.pause();
+        }
+        this.setPlaybackState(true);
+        resolve();
+      }
+    });
+  }
+
+  // 3. Immediate Playback State Affirmation
+  public affirmPlaybackState(playing: boolean): void {
+    this.isPlaying = playing;
+    if (typeof window !== "undefined" && "mediaSession" in navigator) {
+      navigator.mediaSession.playbackState = playing ? "playing" : "paused";
+    }
   }
 
   public ensureAudioContext(): void {
@@ -147,18 +237,16 @@ class AudioService {
       this.worker = new Worker(workerUrl);
 
       this.worker.onmessage = () => {
-        if (this.isPlaying && this.audioElement && this.audioElement.paused) {
-          this.audioElement.play().catch(() => {});
+        const active = this.activeAudio;
+        if (this.isPlaying && active && active.paused) {
+          active.play().catch(() => {});
         }
       };
     } catch (e) {}
   }
 
   public setPlaybackState(playing: boolean): void {
-    this.isPlaying = playing;
-    if (typeof window !== "undefined" && "mediaSession" in navigator) {
-      navigator.mediaSession.playbackState = playing ? "playing" : "paused";
-    }
+    this.affirmPlaybackState(playing);
 
     if (playing) {
       this.requestWakeLock();
@@ -173,8 +261,9 @@ class AudioService {
   }
 
   public resumePlaybackIfNeeded(): void {
-    if (this.isPlaying && this.audioElement && this.audioElement.paused) {
-      this.audioElement.play().catch(() => {});
+    const active = this.activeAudio;
+    if (this.isPlaying && active && active.paused) {
+      active.play().catch(() => {});
     }
     if (this.isPlaying && this.bgAudioElement && this.bgAudioElement.paused) {
       this.bgAudioElement.play().catch(() => {});

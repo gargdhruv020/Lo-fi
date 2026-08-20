@@ -311,9 +311,11 @@ export default function Player() {
       handlePlayPause();
     });
     navigator.mediaSession.setActionHandler("previoustrack", () => {
+      getAudioService().affirmPlaybackState(true);
       handlePrev();
     });
     navigator.mediaSession.setActionHandler("nexttrack", () => {
+      getAudioService().affirmPlaybackState(true);
       handleNext();
     });
     navigator.mediaSession.setActionHandler("seekbackward", () => {
@@ -541,39 +543,27 @@ export default function Player() {
     }
   };
 
-  // Start playback via native audio element (supports mobile background)
-  const startNativeAudio = (audioUrl: string) => {
-    const audio = nativeAudioRef.current;
-    if (!audio) return false;
-
+  // Start playback via Dual-Audio Element Buffer Swap (supports mobile background without notification drops)
+  const startNativeAudio = (audioUrl: string, initialTime?: number) => {
     useNativeAudioRef.current = true;
     stopYoutubePlayer();
 
-    audio.src = audioUrl;
-    audio.volume = isMuted ? 0 : volume;
-    audio.load();
+    getAudioService()
+      .swapAndPlay(audioUrl, volume, isMuted, initialTime || currentTime)
+      .then(() => {
+        nativeAudioRef.current = getAudioService().activeAudio;
+        if (activeTrackIdRef.current) {
+          setIsPlaying(true);
+          setIsLoadingTrack(false);
+          startTimeSyncInterval();
+          updateMediaSession();
+        }
+      })
+      .catch((err) => {
+        console.warn("Dual audio swap play failed, falling back to YouTube iframe:", err);
+        useNativeAudioRef.current = false;
+      });
 
-    if (currentTime > 0 && Math.abs(audio.currentTime - currentTime) > 1) {
-      try { audio.currentTime = currentTime; } catch (e) {}
-    }
-
-    const playPromise = audio.play();
-    if (playPromise) {
-      playPromise
-        .then(() => {
-          if (activeTrackIdRef.current) {
-            setIsPlaying(true);
-            setIsLoadingTrack(false);
-            startTimeSyncInterval();
-            updateMediaSession();
-          }
-        })
-        .catch(() => {
-          // Native audio failed — fall back to YouTube iframe
-          console.warn("Native audio play failed, falling back to YouTube iframe");
-          useNativeAudioRef.current = false;
-        });
-    }
     return true;
   };
 
@@ -866,9 +856,11 @@ export default function Player() {
       handlePlayPause();
     });
     navigator.mediaSession.setActionHandler("previoustrack", () => {
+      getAudioService().affirmPlaybackState(true);
       handlePrev();
     });
     navigator.mediaSession.setActionHandler("nexttrack", () => {
+      getAudioService().affirmPlaybackState(true);
       handleNext();
     });
     navigator.mediaSession.setActionHandler("seekbackward", () => {
