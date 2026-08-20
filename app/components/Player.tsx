@@ -59,6 +59,7 @@ export default function Player() {
 
   const wakeLockRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const silentNodeRef = useRef<AudioNode | null>(null);
   const bgWorkerRef = useRef<Worker | null>(null);
 
   // Screen Wake Lock API helper functions to prevent mobile tab deep sleep
@@ -100,6 +101,38 @@ export default function Player() {
 
     if (audioContextRef.current && audioContextRef.current.state === "suspended") {
       audioContextRef.current.resume().catch(() => {});
+    }
+  };
+
+  // Web Audio silent processing node — keeps mobile audio graph active during mobile backgrounding
+  const startSilentAudioNode = () => {
+    if (typeof window === "undefined") return;
+    try {
+      ensureAudioContext();
+      const ctx = audioContextRef.current;
+      if (!ctx) return;
+
+      if (!silentNodeRef.current) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        gain.gain.value = 0.0001; // Inaudible gain
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        silentNodeRef.current = osc;
+      }
+    } catch (e) {
+      console.warn("Failed to start Web Audio silent processing node:", e);
+    }
+  };
+
+  const stopSilentAudioNode = () => {
+    if (silentNodeRef.current) {
+      try {
+        (silentNodeRef.current as any).stop?.();
+        silentNodeRef.current.disconnect();
+      } catch (e) {}
+      silentNodeRef.current = null;
     }
   };
 
@@ -662,7 +695,7 @@ export default function Player() {
     };
   }, []);
 
-  // Sync Media Session playback state, Wake Lock, Audio Context & Background Worker
+  // Sync Media Session playback state, Wake Lock, Audio Context, Silent Node & Background Worker
   useEffect(() => {
     if (typeof window !== "undefined" && "mediaSession" in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
@@ -672,23 +705,36 @@ export default function Player() {
       (window as any).__isPlayingRequested = true;
       requestWakeLock();
       ensureAudioContext();
+      startSilentAudioNode();
       bgWorkerRef.current?.postMessage("start");
     } else {
       (window as any).__isPlayingRequested = false;
       releaseWakeLock();
+      stopSilentAudioNode();
       bgWorkerRef.current?.postMessage("stop");
     }
   }, [isPlaying]);
 
-  // Handle tab visibility restoration: re-acquire Screen Wake Lock & resume Audio Context
+  // Handle tab visibility restoration: re-acquire Screen Wake Lock & resume Audio Context whenever document.hidden becomes false
   useEffect(() => {
     const handleVisibilityChange = () => {
-      const player = ytPlayerRef.current;
-      if (document.visibilityState === "visible") {
+      const isVisible = !document.hidden && document.visibilityState === "visible";
+      if (isVisible) {
+        // Explicitly resume Audio Context whenever page visibility is restored
+        ensureAudioContext();
+        if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+          audioContextRef.current.resume().catch(() => {});
+        }
+
         if ((window as any).__isPlayingRequested || isPlaying) {
           requestWakeLock();
-          ensureAudioContext();
+          startSilentAudioNode();
+          if (useNativeAudioRef.current && nativeAudioRef.current && nativeAudioRef.current.paused) {
+            nativeAudioRef.current.play().catch(() => {});
+          }
         }
+
+        const player = ytPlayerRef.current;
         if (player && typeof player.getCurrentTime === "function") {
           setCurrentTime(player.getCurrentTime() || 0);
           setDuration(player.getDuration() || 0);
@@ -948,7 +994,12 @@ export default function Player() {
 
       {/* Native Audio Element — primary playback engine for mobile background support */}
       <audio
-        ref={nativeAudioRef}
+        ref={(el) => {
+          nativeAudioRef.current = el;
+          if (typeof window !== "undefined" && el) {
+            (window as any).__lofiNativeAudio = el;
+          }
+        }}
         className="hidden"
         preload="auto"
         onEnded={handleEnded}
