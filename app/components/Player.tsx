@@ -360,15 +360,8 @@ export default function Player() {
         const audio = nativeAudioRef.current;
         if (!audio.paused && !isSeeking) {
           setCurrentTime(audio.currentTime || 0);
-          if (audio.duration && !isNaN(audio.duration) && audio.duration > 0) {
-            setDuration(audio.duration);
-          }
+          setDuration(audio.duration || 0);
           updateMediaPosition();
-
-          if (audio.ended || (audio.duration > 0 && audio.currentTime >= audio.duration - 0.5)) {
-            stopTimeSyncInterval();
-            handleNext();
-          }
         }
       } else {
         // YouTube iframe is the active engine
@@ -377,9 +370,7 @@ export default function Player() {
           const state = player.getPlayerState();
           if (state === 1 && !isSeeking) {
             setCurrentTime(player.getCurrentTime() || 0);
-            if (player.getDuration() && !isNaN(player.getDuration()) && player.getDuration() > 0) {
-              setDuration(player.getDuration());
-            }
+            setDuration(player.getDuration() || 0);
             updateMediaPosition();
           }
         }
@@ -684,30 +675,14 @@ export default function Player() {
     stopTimeSyncInterval();
     getAudioService().primeUserGesture();
 
-    // 1. INSTANT NATIVE AUDIO PLAYBACK: Start playing immediate native MP3 stream for seamless background playback
-    const immediateUrl = audioCacheRef.current[track.id]?.audioUrl || track.url;
-    if (immediateUrl) {
-      useNativeAudioRef.current = true;
-      stopYoutubePlayer();
+    // Helper to start native or youtube audio from stream data
+    const startStreamPlayback = (data: { videoId: string; audioUrl: string | null }) => {
+      if (activeTrackIdRef.current !== track.id) return;
 
-      getAudioService()
-        .playSource(immediateUrl, volumeRef.current, isMutedRef.current)
-        .then(() => {
-          if (activeTrackIdRef.current === track.id) {
-            nativeAudioRef.current = getAudioService().audioElement;
-            setIsPlaying(true);
-            setIsLoadingTrack(false);
-            startTimeSyncInterval();
-            updateMediaSession(track);
-          }
-        })
-        .catch(() => {});
-    }
-
-    // 2. Async stream resolution in background to upgrade to high-quality audio URL
-    fetchAndCacheTrack(track).then((data) => {
-      if (data && data.audioUrl && activeTrackIdRef.current === track.id) {
+      if (data.audioUrl) {
         useNativeAudioRef.current = true;
+        stopYoutubePlayer();
+
         getAudioService()
           .playSource(data.audioUrl, volumeRef.current, isMutedRef.current)
           .then(() => {
@@ -719,8 +694,26 @@ export default function Player() {
               updateMediaSession(track);
             }
           })
-          .catch(() => {});
-      } else if (!immediateUrl) {
+          .catch(() => {
+            useNativeAudioRef.current = false;
+            startYoutubePlayback(data.videoId, track);
+          });
+      } else {
+        startYoutubePlayback(data.videoId, track);
+      }
+    };
+
+    // 1. INSTANT PLAYBACK: If stream is already in cache, start playing immediately (0ms delay)
+    if (audioCacheRef.current[track.id]) {
+      startStreamPlayback(audioCacheRef.current[track.id]);
+      return;
+    }
+
+    // 2. Async fetch fallback if not yet in cache
+    fetchAndCacheTrack(track).then((data) => {
+      if (data) {
+        startStreamPlayback(data);
+      } else {
         setIsLoadingTrack(false);
       }
     });
