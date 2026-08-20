@@ -24,20 +24,92 @@ export default function Player() {
       .catch((err) => console.warn("Failed to load initial downloaded tracks:", err));
   }, []);
 
-  // State Management
+  // State Management with LocalStorage persistence
   const [currentTrackId, setCurrentTrackId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedRaw = localStorage.getItem("lofi_player_state");
+        if (savedRaw) {
+          const saved = JSON.parse(savedRaw);
+          if (saved && saved.trackId) return saved.trackId;
+        }
+      } catch (e) {}
+    }
     const defaultCatalog = getHustleCatalog();
     return defaultCatalog.length > 0 ? defaultCatalog[0].id : "";
   });
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
+
+  const [currentIndex, setCurrentIndex] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedRaw = localStorage.getItem("lofi_player_state");
+        if (savedRaw) {
+          const saved = JSON.parse(savedRaw);
+          if (typeof saved.index === "number") return saved.index;
+        }
+      } catch (e) {}
+    }
+    return 0;
+  });
+
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+
+  const [currentTime, setCurrentTime] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedRaw = localStorage.getItem("lofi_player_state");
+        if (savedRaw) {
+          const saved = JSON.parse(savedRaw);
+          if (typeof saved.currentTime === "number") return saved.currentTime;
+        }
+      } catch (e) {}
+    }
+    return 0;
+  });
+
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.8);
-  const [isMuted, setIsMuted] = useState(false);
+
+  const [volume, setVolume] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedRaw = localStorage.getItem("lofi_player_state");
+        if (savedRaw) {
+          const saved = JSON.parse(savedRaw);
+          if (typeof saved.volume === "number") return saved.volume;
+        }
+      } catch (e) {}
+    }
+    return 0.8;
+  });
+
+  const [isMuted, setIsMuted] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedRaw = localStorage.getItem("lofi_player_state");
+        if (savedRaw) {
+          const saved = JSON.parse(savedRaw);
+          if (typeof saved.isMuted === "boolean") return saved.isMuted;
+        }
+      } catch (e) {}
+    }
+    return false;
+  });
+
   const [isSeeking, setIsSeeking] = useState(false);
   const [isLoadingTrack, setIsLoadingTrack] = useState(false);
-  const [isShuffled, setIsShuffled] = useState(false);
+
+  const [isShuffled, setIsShuffled] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedRaw = localStorage.getItem("lofi_player_state");
+        if (savedRaw) {
+          const saved = JSON.parse(savedRaw);
+          if (typeof saved.isShuffled === "boolean") return saved.isShuffled;
+        }
+      } catch (e) {}
+    }
+    return false;
+  });
 
   // Catalog panel states
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
@@ -323,6 +395,25 @@ export default function Player() {
     tracksRef.current = tracks;
   }, [tracks]);
 
+  // Save Player State to LocalStorage on track, time, or control changes
+  useEffect(() => {
+    if (typeof window === "undefined" || !currentTrackId) return;
+
+    try {
+      const stateToSave = {
+        trackId: currentTrackId,
+        index: currentIndex,
+        currentTime: currentTime,
+        volume: volume,
+        isMuted: isMuted,
+        isShuffled: isShuffled,
+      };
+      localStorage.setItem("lofi_player_state", JSON.stringify(stateToSave));
+    } catch (err) {
+      console.warn("Failed to save player state to localStorage:", err);
+    }
+  }, [currentTrackId, currentIndex, currentTime, volume, isMuted, isShuffled]);
+
   // Initialize tracks and bind Global Audio Service Singleton on client mount
   useEffect(() => {
     setTracks(catalog);
@@ -461,6 +552,10 @@ export default function Player() {
     audio.src = audioUrl;
     audio.volume = isMuted ? 0 : volume;
     audio.load();
+
+    if (currentTime > 0 && Math.abs(audio.currentTime - currentTime) > 1) {
+      try { audio.currentTime = currentTime; } catch (e) {}
+    }
 
     const playPromise = audio.play();
     if (playPromise) {
