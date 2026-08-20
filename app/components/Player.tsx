@@ -439,9 +439,6 @@ export default function Player() {
       if (audioService.audioElement) {
         nativeAudioRef.current = audioService.audioElement;
       }
-      if (audioService.bgAudioElement) {
-        bgAudioRef.current = audioService.bgAudioElement;
-      }
     }
   }, [catalog]);
 
@@ -557,15 +554,15 @@ export default function Player() {
     }
   };
 
-  // Start playback via Dual-Audio Element Buffer Swap (supports mobile background without notification drops)
+  // Start playback via single persistent HTML5 audio element
   const startNativeAudio = (audioUrl: string, initialTime?: number) => {
     useNativeAudioRef.current = true;
     stopYoutubePlayer();
 
     getAudioService()
-      .swapAndPlay(audioUrl, volume, isMuted, initialTime || currentTime)
+      .playSource(audioUrl, volume, isMuted, initialTime || currentTime)
       .then(() => {
-        nativeAudioRef.current = getAudioService().activeAudio;
+        nativeAudioRef.current = getAudioService().audioElement;
         if (activeTrackIdRef.current) {
           setIsPlaying(true);
           setIsLoadingTrack(false);
@@ -574,7 +571,7 @@ export default function Player() {
         }
       })
       .catch((err) => {
-        console.warn("Dual audio swap play failed, falling back to YouTube iframe:", err);
+        console.warn("Native audio play failed, falling back to YouTube iframe:", err);
         useNativeAudioRef.current = false;
       });
 
@@ -629,11 +626,8 @@ export default function Player() {
       } catch (e) {}
     }
 
-    // Secure background keep-alive + native audio permissions synchronously in click handler
-    bgAudioRef.current?.play().then(() => bgAudioRef.current?.pause()).catch(() => {});
-    if (nativeAudioRef.current) {
-      nativeAudioRef.current.play().then(() => nativeAudioRef.current?.pause()).catch(() => {});
-    }
+    // Synchronously prime / unlock persistent HTML5 audio element on first user gesture
+    getAudioService().primeUserGesture();
 
     // Fetch the YouTube Video ID (and optionally a direct audio URL)
     const queryParams = new URLSearchParams({
@@ -657,39 +651,26 @@ export default function Player() {
 
         // Try native audio first (works in mobile background), fall back to YouTube iframe
         if (data.audioUrl) {
-          const audio = nativeAudioRef.current;
-          if (audio) {
-            useNativeAudioRef.current = true;
-            stopYoutubePlayer();
+          useNativeAudioRef.current = true;
+          stopYoutubePlayer();
 
-            audio.src = data.audioUrl;
-            audio.volume = isMuted ? 0 : volume;
-            audio.load();
-
-            const playPromise = audio.play();
-            if (playPromise) {
-              playPromise
-                .then(() => {
-                  if (activeTrackIdRef.current === track.id) {
-                    bgAudioRef.current?.play().catch(() => {});
-                    setIsPlaying(true);
-                    setIsLoadingTrack(false);
-                    startTimeSyncInterval();
-                    updateMediaSession();
-                  }
-                })
-                .catch(() => {
-                  // Native audio failed, fall back to YouTube iframe
-                  console.warn("Native audio failed, falling back to YouTube iframe");
-                  useNativeAudioRef.current = false;
-                  startYoutubePlayback(data.videoId);
-                });
-            }
-          } else {
-            startYoutubePlayback(data.videoId);
-          }
+          getAudioService()
+            .playSource(data.audioUrl, volume, isMuted)
+            .then(() => {
+              if (activeTrackIdRef.current === track.id) {
+                nativeAudioRef.current = getAudioService().audioElement;
+                setIsPlaying(true);
+                setIsLoadingTrack(false);
+                startTimeSyncInterval();
+                updateMediaSession();
+              }
+            })
+            .catch(() => {
+              console.warn("Native audio failed, falling back to YouTube iframe");
+              useNativeAudioRef.current = false;
+              startYoutubePlayback(data.videoId);
+            });
         } else {
-          // No audio URL available, use YouTube iframe directly
           startYoutubePlayback(data.videoId);
         }
       })
@@ -914,23 +895,19 @@ export default function Player() {
   };
 
   const handlePlayPause = () => {
+    getAudioService().primeUserGesture();
+
     // If native audio is the active engine
     if (useNativeAudioRef.current && nativeAudioRef.current) {
       const audio = nativeAudioRef.current;
       if (audio.paused) {
-        if ("mediaSession" in navigator) {
-          navigator.mediaSession.playbackState = "playing";
-        }
+        getAudioService().setPlaybackState(true);
         audio.play().catch(() => {});
-        bgAudioRef.current?.play().catch(() => {});
         setIsPlaying(true);
         startTimeSyncInterval();
       } else {
-        if ("mediaSession" in navigator) {
-          navigator.mediaSession.playbackState = "paused";
-        }
+        getAudioService().setPlaybackState(false);
         audio.pause();
-        bgAudioRef.current?.pause();
         setIsPlaying(false);
         stopTimeSyncInterval();
       }
