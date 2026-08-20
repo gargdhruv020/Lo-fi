@@ -149,6 +149,7 @@ export default function Player() {
     if (!track) return;
 
     setCurrentTrackId(track.id);
+    activeTrackIdRef.current = track.id;
     setIsLoadingTrack(true);
     setIsPlaying(false);
 
@@ -301,10 +302,18 @@ export default function Player() {
       setIsPlaying(false);
     });
     navigator.mediaSession.setActionHandler("previoustrack", () => {
-      if (tracks.length > 0) setCurrentTrackId(getSiblingTrackId("prev"));
+      if (tracks.length > 0) {
+        const prevId = getSiblingTrackId("prev");
+        const prevTrack = tracks.find((t) => t.id === prevId);
+        if (prevTrack) playTrack(prevTrack);
+      }
     });
     navigator.mediaSession.setActionHandler("nexttrack", () => {
-      if (tracks.length > 0) setCurrentTrackId(getSiblingTrackId("next"));
+      if (tracks.length > 0) {
+        const nextId = getSiblingTrackId("next");
+        const nextTrack = tracks.find((t) => t.id === nextId);
+        if (nextTrack) playTrack(nextTrack);
+      }
     });
     navigator.mediaSession.setActionHandler("seekbackward", () => {
       if (audioRef.current) {
