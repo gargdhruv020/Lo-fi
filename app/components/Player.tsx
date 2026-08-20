@@ -203,6 +203,11 @@ export default function Player() {
 
           // Swap sources seamlessly if we are still playing the fallback loop for this track and user is still on this track
           if (activeTrackIdRef.current === track.id && audio.src.includes("/audio/song")) {
+            // If the returned URL is a fallback, do NOT swap to prevent browser autoplay blocks!
+            if (data.url.includes("/audio/song")) {
+              setIsLoadingTrack(false);
+              return;
+            }
             const currentPlaybackTime = audio.currentTime;
             isSwappingSource.current = true;
             audio.src = data.url;
