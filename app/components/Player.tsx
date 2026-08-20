@@ -360,6 +360,12 @@ export default function Player() {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
 
+    // If no source is loaded yet (first click on the play button after mount), play currentTrack synchronously
+    if (!audio.src || audio.src === window.location.href || audio.src.endsWith("/")) {
+      playTrack(currentTrack);
+      return;
+    }
+
     if (isPlaying) {
       audio.pause();
       setIsPlaying(false);
