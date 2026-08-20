@@ -57,6 +57,52 @@ export default function Player() {
   const shouldPlayOnReadyRef = useRef(false);
   const queuedVideoIdRef = useRef<string | null>(null);
 
+  const wakeLockRef = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const bgWorkerRef = useRef<Worker | null>(null);
+
+  // Screen Wake Lock API helper functions to prevent mobile tab deep sleep
+  const requestWakeLock = async () => {
+    if (typeof window !== "undefined" && "wakeLock" in navigator && !wakeLockRef.current) {
+      try {
+        wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
+        wakeLockRef.current.addEventListener("release", () => {
+          wakeLockRef.current = null;
+        });
+      } catch (err) {
+        console.warn("Wake Lock request failed:", err);
+      }
+    }
+  };
+
+  const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+      } catch (err) {
+        console.warn("Wake Lock release failed:", err);
+      }
+      wakeLockRef.current = null;
+    }
+  };
+
+  // Audio Context State Maintenance helper to prevent Web Audio / AudioContext pause on focus loss
+  const ensureAudioContext = () => {
+    if (typeof window === "undefined") return;
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new AudioCtx();
+      } catch (e) {}
+    }
+
+    if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+      audioContextRef.current.resume().catch(() => {});
+    }
+  };
+
   // Load YouTube Iframe Player API script dynamically on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -580,27 +626,82 @@ export default function Player() {
     }
   }, [volume, isMuted]);
 
-  // Sync Media Session playback state and handle tab visibility restoration
+  // Lightweight Background Web Worker fallback timer trick to prevent mobile power-saving CPU throttle
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof Worker === "undefined") return;
+
+    const workerCode = `
+      let timer = null;
+      self.onmessage = function(e) {
+        if (e.data === 'start') {
+          if (timer) clearInterval(timer);
+          timer = setInterval(() => { self.postMessage('tick'); }, 1000);
+        } else if (e.data === 'stop') {
+          if (timer) { clearInterval(timer); timer = null; }
+        }
+      };
+    `;
+    const blob = new Blob([workerCode], { type: "application/javascript" });
+    const workerUrl = URL.createObjectURL(blob);
+    const worker = new Worker(workerUrl);
+
+    worker.onmessage = () => {
+      // Background worker heartbeat callback — ensures native audio keeps playing when backgrounded
+      if (useNativeAudioRef.current && nativeAudioRef.current && nativeAudioRef.current.paused) {
+        if ((window as any).__isPlayingRequested) {
+          nativeAudioRef.current.play().catch(() => {});
+        }
+      }
+    };
+
+    bgWorkerRef.current = worker;
+
+    return () => {
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+    };
+  }, []);
+
+  // Sync Media Session playback state, Wake Lock, Audio Context & Background Worker
   useEffect(() => {
     if (typeof window !== "undefined" && "mediaSession" in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
     }
+
+    if (isPlaying) {
+      (window as any).__isPlayingRequested = true;
+      requestWakeLock();
+      ensureAudioContext();
+      bgWorkerRef.current?.postMessage("start");
+    } else {
+      (window as any).__isPlayingRequested = false;
+      releaseWakeLock();
+      bgWorkerRef.current?.postMessage("stop");
+    }
   }, [isPlaying]);
 
+  // Handle tab visibility restoration: re-acquire Screen Wake Lock & resume Audio Context
   useEffect(() => {
     const handleVisibilityChange = () => {
       const player = ytPlayerRef.current;
-      if (document.visibilityState === "visible" && player && typeof player.getCurrentTime === "function") {
-        setCurrentTime(player.getCurrentTime() || 0);
-        setDuration(player.getDuration() || 0);
-        updateMediaPosition();
+      if (document.visibilityState === "visible") {
+        if ((window as any).__isPlayingRequested || isPlaying) {
+          requestWakeLock();
+          ensureAudioContext();
+        }
+        if (player && typeof player.getCurrentTime === "function") {
+          setCurrentTime(player.getCurrentTime() || 0);
+          setDuration(player.getDuration() || 0);
+          updateMediaPosition();
+        }
       }
     };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [isPlaying]);
 
   // Media Session API — enables Bluetooth headphones, lock screen, and system media controls
   useEffect(() => {
