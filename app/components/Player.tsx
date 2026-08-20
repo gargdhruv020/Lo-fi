@@ -226,9 +226,15 @@ export default function Player() {
 
     // Re-bind action handlers to ensure they point to our controller instead of YouTube's defaults
     navigator.mediaSession.setActionHandler("play", () => {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "playing";
+      }
       handlePlayPause();
     });
     navigator.mediaSession.setActionHandler("pause", () => {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "paused";
+      }
       handlePlayPause();
     });
     navigator.mediaSession.setActionHandler("previoustrack", () => {
@@ -758,9 +764,15 @@ export default function Player() {
     });
 
     navigator.mediaSession.setActionHandler("play", () => {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "playing";
+      }
       handlePlayPause();
     });
     navigator.mediaSession.setActionHandler("pause", () => {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "paused";
+      }
       handlePlayPause();
     });
     navigator.mediaSession.setActionHandler("previoustrack", () => {
@@ -810,12 +822,17 @@ export default function Player() {
     if (useNativeAudioRef.current && nativeAudioRef.current) {
       const audio = nativeAudioRef.current;
       if (audio.paused) {
+        if ("mediaSession" in navigator) {
+          navigator.mediaSession.playbackState = "playing";
+        }
         audio.play().catch(() => {});
         bgAudioRef.current?.play().catch(() => {});
         setIsPlaying(true);
         startTimeSyncInterval();
-        updateMediaSession();
       } else {
+        if ("mediaSession" in navigator) {
+          navigator.mediaSession.playbackState = "paused";
+        }
         audio.pause();
         bgAudioRef.current?.pause();
         setIsPlaying(false);
