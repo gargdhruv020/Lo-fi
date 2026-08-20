@@ -606,6 +606,22 @@ export default function Player() {
   const playTrack = (track: CatalogTrack, explicitIndex?: number) => {
     if (!track) return;
 
+    // 1. Pre-emptive Metadata Synchronization before source swap
+    if (typeof window !== "undefined" && "mediaSession" in navigator) {
+      (window as any).__customTrackTitle = track.title;
+      navigator.mediaSession.playbackState = "playing";
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title,
+        artist: track.artist,
+        album: `Lo-Fi Radio — ${track.season === 1 ? "90s & 2000s" : track.season === 2 ? "Retro & Golden Era" : "Modern & Indie"}`,
+        artwork: [
+          { src: track.cover, sizes: "512x512", type: "image/jpeg" },
+        ],
+      });
+    }
+
+    getAudioService().affirmPlaybackState(true);
+
     const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
     const idx = explicitIndex !== undefined ? explicitIndex : activePlaylist.findIndex((t) => t.id === track.id);
     const validIndex = idx !== -1 ? idx : 0;
@@ -615,10 +631,8 @@ export default function Player() {
     setCurrentTrackId(track.id);
     activeTrackIdRef.current = track.id;
     setIsLoadingTrack(true);
-    setIsPlaying(false);
+    setIsPlaying(true);
     stopTimeSyncInterval();
-    stopNativeAudio();
-    bgAudioRef.current?.pause();
 
     // Secure browser user-gesture token by executing a play command synchronously
     const player = ytPlayerRef.current;
@@ -655,41 +669,10 @@ export default function Player() {
           return;
         }
 
-        // Try native audio first (works in mobile background), fall back to YouTube iframe
+        // Try native audio first via Dual-Buffer Swap (works in mobile background), fall back to YouTube iframe
         if (data.audioUrl) {
-          const audio = nativeAudioRef.current;
-          if (audio) {
-            useNativeAudioRef.current = true;
-            stopYoutubePlayer();
-
-            audio.src = data.audioUrl;
-            audio.volume = isMuted ? 0 : volume;
-            audio.load();
-
-            const playPromise = audio.play();
-            if (playPromise) {
-              playPromise
-                .then(() => {
-                  if (activeTrackIdRef.current === track.id) {
-                    bgAudioRef.current?.play().catch(() => {});
-                    setIsPlaying(true);
-                    setIsLoadingTrack(false);
-                    startTimeSyncInterval();
-                    updateMediaSession();
-                  }
-                })
-                .catch(() => {
-                  // Native audio failed, fall back to YouTube iframe
-                  console.warn("Native audio failed, falling back to YouTube iframe");
-                  useNativeAudioRef.current = false;
-                  startYoutubePlayback(data.videoId);
-                });
-            }
-          } else {
-            startYoutubePlayback(data.videoId);
-          }
+          startNativeAudio(data.audioUrl);
         } else {
-          // No audio URL available, use YouTube iframe directly
           startYoutubePlayback(data.videoId);
         }
       })
