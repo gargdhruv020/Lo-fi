@@ -1012,8 +1012,10 @@ export default function Player() {
     const activeList = activePlaylistRef.current.length > 0 ? activePlaylistRef.current : catalog;
     if (activeList.length === 0) return;
 
-    const currentListIndex = activeList.findIndex((t) => t.id === currentTrackId);
-    const safeIndex = currentListIndex !== -1 ? currentListIndex : 0;
+    // Use live activeTrackIdRef.current to prevent background MediaSession closure stale values
+    const liveTrackId = activeTrackIdRef.current || currentTrackId;
+    const currentListIndex = activeList.findIndex((t) => t.id === liveTrackId);
+    const safeIndex = currentListIndex !== -1 ? currentListIndex : currentIndexRef.current;
     const nextIndex = (safeIndex + 1) % activeList.length;
     const nextTrack = activeList[nextIndex];
 
@@ -1027,8 +1029,9 @@ export default function Player() {
     const activeList = activePlaylistRef.current.length > 0 ? activePlaylistRef.current : catalog;
     if (activeList.length === 0) return;
 
-    const currentListIndex = activeList.findIndex((t) => t.id === currentTrackId);
-    const safeIndex = currentListIndex !== -1 ? currentListIndex : 0;
+    const liveTrackId = activeTrackIdRef.current || currentTrackId;
+    const currentListIndex = activeList.findIndex((t) => t.id === liveTrackId);
+    const safeIndex = currentListIndex !== -1 ? currentListIndex : currentIndexRef.current;
     const prevIndex = (safeIndex - 1 + activeList.length) % activeList.length;
     const prevTrack = activeList[prevIndex];
 
