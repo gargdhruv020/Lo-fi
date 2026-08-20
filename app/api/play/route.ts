@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exec } from "child_process";
 import fs from "fs";
 import path from "path";
+import ffmpeg from "ffmpeg-static";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -35,10 +36,11 @@ export async function GET(request: NextRequest) {
   // yt-dlp command to download best audio as m4a, matching only videos under 6 minutes to avoid downloading full episodes
   const cmd = `"${ytdlpPath}" -f "ba[ext=m4a]" --match-filter "duration < 360" "ytsearch:${searchQuery}" -o "${outputPath}"`;
 
+  const ffmpegDir = ffmpeg ? path.dirname(ffmpeg) : "";
   const nodePath = "C:\\Program Files\\nodejs";
   const customEnv = {
     ...process.env,
-    PATH: `${nodePath};${process.env.PATH || ""}`,
+    PATH: `${nodePath};${ffmpegDir};${process.env.PATH || ""}`,
   };
 
   return new Promise<NextResponse>((resolve) => {
