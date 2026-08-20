@@ -2,12 +2,16 @@ import React from "react";
 import Clock from "./components/Clock";
 import ListenerCount from "./components/ListenerCount";
 import Player from "./components/Player";
+import PullToRefresh from "./components/PullToRefresh";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export default function Home() {
   return (
     <main className="relative flex min-h-dvh h-dvh w-full flex-1 flex-col items-center justify-between overflow-x-hidden overflow-y-auto sm:overflow-hidden select-none bg-black text-white">
+      {/* Pull-to-Refresh mobile gesture controller */}
+      <PullToRefresh />
+
       {/* 1. Fixed background container with responsive cover & dynamic 100dvh units */}
       <div className="fixed inset-0 -z-20 h-dvh w-full hero-bg pointer-events-none">
         {/* Spotlight curtain overlay gradient */}
