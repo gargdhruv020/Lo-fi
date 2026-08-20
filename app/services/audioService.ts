@@ -36,6 +36,7 @@ class AudioService {
     }
     this.audioB = (window as any).__lofiAudioB;
 
+    // Secondary Session-Keeper / Silence element for Android Chrome continuous session lock
     if (!(window as any).__lofiBgAudioSingleton) {
       const bgAudio = document.createElement("audio");
       bgAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAAA";
@@ -83,7 +84,7 @@ class AudioService {
     return this.activeAudio;
   }
 
-  // 2. Non-Destructive Source Loading & Dual-Audio Buffer Swap
+  // 2. Non-Destructive Source Loading & Dual-Audio Buffer Swap with Secondary Session-Keeper
   public swapAndPlay(
     newUrl: string,
     volume: number = 0.8,
@@ -97,6 +98,14 @@ class AudioService {
       if (!targetAudio) {
         reject("No target audio element available");
         return;
+      }
+
+      // Re-assert MediaSession playbackState synchronously before updating source
+      this.affirmPlaybackState(true);
+
+      // Trigger micro-playback on secondary session-keeper element to maintain continuous Android Chrome session thread
+      if (this.bgAudioElement) {
+        this.bgAudioElement.play().catch(() => {});
       }
 
       // Load new source into INACTIVE audio element while current is still active
@@ -122,6 +131,7 @@ class AudioService {
               currentAudio.pause();
             }
 
+            // Immediately re-assert playback state to lock OS notification
             this.setPlaybackState(true);
             resolve();
           })
