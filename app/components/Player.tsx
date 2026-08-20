@@ -322,14 +322,8 @@ export default function Player() {
   const handleAudioError = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    console.warn("Audio playback encountered an error, falling back to a local loop.");
-    if (!audio.src.includes("/audio/song")) {
-      audio.src = "/audio/song1.mp3";
-      audio.load();
-      if (isPlaying) {
-        audio.play().catch(() => {});
-      }
-    }
+    console.warn("Audio playback encountered an error, skipping to next track.");
+    handleNext();
   };
 
   const handlePlayPause = () => {

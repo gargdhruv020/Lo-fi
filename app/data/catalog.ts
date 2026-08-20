@@ -8,14 +8,7 @@ export interface CatalogTrack {
   isFavourite?: boolean;
 }
 
-const audioPool = [
-  "/audio/song1.mp3",
-  "/audio/song2.mp3",
-  "/audio/song3.mp3",
-  "/audio/song4.mp3",
-  "/audio/song5.mp3",
-  "/audio/song6.mp3",
-];
+
 
 const coverPool = [
   "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?q=80&w=300&auto=format&fit=crop",
@@ -268,9 +261,8 @@ export const getHustleCatalog = (): CatalogTrack[] => {
       const id = `s${group.season}-${group.artist.toLowerCase().replace(/[^a-z0-9]/g, "")}-${title.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
       const compositeKey = `${title}-${group.artist}`;
       
-      const audioIdx = getHash(compositeKey, audioPool.length);
       const coverIdx = getHash(compositeKey, coverPool.length);
-
+      
       const isFavourite = favouritesList.some(
         (fav) =>
           fav.title.toLowerCase().trim() === title.toLowerCase().trim() &&
@@ -282,7 +274,7 @@ export const getHustleCatalog = (): CatalogTrack[] => {
         title,
         artist: group.artist,
         season: group.season,
-        url: audioPool[audioIdx],
+        url: "",
         cover: coverPool[coverIdx],
         isFavourite,
       });
