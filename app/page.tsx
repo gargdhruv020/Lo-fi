@@ -2,24 +2,27 @@ import React from "react";
 import Clock from "./components/Clock";
 import ListenerCount from "./components/ListenerCount";
 import Player from "./components/Player";
-import PullToRefresh from "./components/PullToRefresh";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export default function Home() {
   return (
-    <main className="relative flex min-h-dvh h-dvh w-full flex-1 flex-col items-center justify-between overflow-x-hidden overflow-y-auto sm:overflow-hidden select-none bg-black text-white">
-      {/* Pull-to-Refresh mobile gesture controller */}
-      <PullToRefresh />
-
-      {/* 1. Fixed background container with responsive cover & dynamic 100dvh units */}
-      <div className="fixed inset-0 -z-20 h-dvh w-full hero-bg pointer-events-none">
+    <main className="relative flex min-h-dvh flex-1 flex-col items-center justify-between overflow-hidden">
+      {/* 1. Fixed background image — uses object-fit for perfect portrait+landscape on all devices */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/lofi-bg.jpg"
+          alt=""
+          className="w-full h-full object-cover object-center"
+          style={{ display: "block" }}
+        />
         {/* Spotlight curtain overlay gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/60" />
       </div>
 
       {/* 2. Fixed grain overlay */}
-      <div className="fixed inset-0 -z-10 grain-overlay mix-blend-overlay opacity-15 pointer-events-none" />
+      <div className="fixed inset-0 z-0 grain-overlay mix-blend-overlay opacity-15 pointer-events-none" />
 
       {/* 3. Fixed top row (using safe-area-insets) */}
       {/* Clock Top-Left */}
@@ -40,6 +43,8 @@ export default function Home() {
           <ListenerCount />
         </div>
       </div>
+
+
 
       {/* 4. Bottom-anchored Glass Player */}
       <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-full max-w-xl px-4 z-30 flex justify-center">
