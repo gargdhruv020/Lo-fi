@@ -158,6 +158,10 @@ export default function Player() {
 
     // Synchronously activate the audio element within the user click gesture stack
     // to secure browser playback permissions for the upcoming async URL swap
+    if (!audio.src || audio.src === window.location.href || audio.src.endsWith("/")) {
+      audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAAA";
+      audio.load();
+    }
     audio.play()
       .then(() => audio.pause())
       .catch(() => {});
@@ -331,6 +335,18 @@ export default function Player() {
   const handleAudioError = () => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    // Ignore error events if we are swapping sources, or if the source is empty/uninitialized/data URI
+    if (
+      !audio.src || 
+      audio.src === window.location.href || 
+      audio.src.endsWith("/") || 
+      audio.src.startsWith("data:") ||
+      isSwappingSource.current
+    ) {
+      return;
+    }
+
     console.warn("Audio playback encountered an error, skipping to next track.");
     handleNext();
   };
