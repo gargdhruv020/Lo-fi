@@ -1073,7 +1073,14 @@ export default function Player() {
   };
 
   const selectTrack = (track: CatalogTrack) => {
-    playTrack(track);
+    if (filteredTracks.length > 0) {
+      setTracks(filteredTracks);
+      tracksRef.current = filteredTracks;
+      const idx = filteredTracks.findIndex((t) => t.id === track.id);
+      playTrack(track, idx !== -1 ? idx : undefined);
+    } else {
+      playTrack(track);
+    }
   };
 
   const formatTime = (time: number) => {
@@ -1202,7 +1209,9 @@ export default function Player() {
                       );
                       if (seasonTracks.length > 0) {
                         setActiveSeason(season);
-                        playTrack(seasonTracks[0]);
+                        setTracks(seasonTracks);
+                        tracksRef.current = seasonTracks;
+                        playTrack(seasonTracks[0], 0);
                       }
                     }}
                     className="w-5 h-5 rounded-full flex items-center justify-center bg-white/5 hover:bg-rose-500/80 text-white/50 hover:text-white transition-all focus:outline-none active:scale-90"
