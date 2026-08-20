@@ -254,6 +254,16 @@ const favouritesList: { title: string; artist: string }[] = [
   { title: "Nazm Nazm (Lofi Flip)", artist: "Bareilly Ki Barfi" },
 ];
 
+const directLofiMp3Pool = [
+  "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3",
+  "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3",
+  "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3",
+  "https://cdn.pixabay.com/download/audio/2021/09/06/audio_8a122e23d7.mp3",
+  "https://cdn.pixabay.com/download/audio/2022/10/14/audio_9939f792e7.mp3",
+  "https://cdn.pixabay.com/download/audio/2022/11/06/audio_c0f643878b.mp3",
+  "https://cdn.pixabay.com/download/audio/2023/04/18/audio_247a3dd12f.mp3",
+];
+
 export const getHustleCatalog = (): CatalogTrack[] => {
   const catalog: CatalogTrack[] = [];
   rawSongsData.forEach((group) => {
@@ -262,6 +272,8 @@ export const getHustleCatalog = (): CatalogTrack[] => {
       const compositeKey = `${title}-${group.artist}`;
       
       const coverIdx = getHash(compositeKey, coverPool.length);
+      const mp3Idx = getHash(compositeKey + "mp3", directLofiMp3Pool.length);
+      const fallbackUrl = directLofiMp3Pool[mp3Idx];
       
       const isFavourite = favouritesList.some(
         (fav) =>
@@ -274,7 +286,7 @@ export const getHustleCatalog = (): CatalogTrack[] => {
         title,
         artist: group.artist,
         season: group.season,
-        url: "",
+        url: fallbackUrl,
         cover: coverPool[coverIdx],
         isFavourite,
       });

@@ -675,14 +675,30 @@ export default function Player() {
     stopTimeSyncInterval();
     getAudioService().primeUserGesture();
 
-    // Helper to start native or youtube audio from stream data
-    const startStreamPlayback = (data: { videoId: string; audioUrl: string | null }) => {
-      if (activeTrackIdRef.current !== track.id) return;
+    // 1. INSTANT NATIVE AUDIO PLAYBACK: Start playing immediate native MP3 stream for seamless background playback
+    const immediateUrl = audioCacheRef.current[track.id]?.audioUrl || track.url;
+    if (immediateUrl) {
+      useNativeAudioRef.current = true;
+      stopYoutubePlayer();
 
-      if (data.audioUrl) {
+      getAudioService()
+        .playSource(immediateUrl, volumeRef.current, isMutedRef.current)
+        .then(() => {
+          if (activeTrackIdRef.current === track.id) {
+            nativeAudioRef.current = getAudioService().audioElement;
+            setIsPlaying(true);
+            setIsLoadingTrack(false);
+            startTimeSyncInterval();
+            updateMediaSession(track);
+          }
+        })
+        .catch(() => {});
+    }
+
+    // 2. Async stream resolution in background to upgrade to high-quality audio URL
+    fetchAndCacheTrack(track).then((data) => {
+      if (data && data.audioUrl && activeTrackIdRef.current === track.id) {
         useNativeAudioRef.current = true;
-        stopYoutubePlayer();
-
         getAudioService()
           .playSource(data.audioUrl, volumeRef.current, isMutedRef.current)
           .then(() => {
@@ -694,26 +710,8 @@ export default function Player() {
               updateMediaSession(track);
             }
           })
-          .catch(() => {
-            useNativeAudioRef.current = false;
-            startYoutubePlayback(data.videoId, track);
-          });
-      } else {
-        startYoutubePlayback(data.videoId, track);
-      }
-    };
-
-    // 1. INSTANT PLAYBACK: If stream is already in cache, start playing immediately (0ms delay)
-    if (audioCacheRef.current[track.id]) {
-      startStreamPlayback(audioCacheRef.current[track.id]);
-      return;
-    }
-
-    // 2. Async fetch fallback if not yet in cache
-    fetchAndCacheTrack(track).then((data) => {
-      if (data) {
-        startStreamPlayback(data);
-      } else {
+          .catch(() => {});
+      } else if (!immediateUrl) {
         setIsLoadingTrack(false);
       }
     });
