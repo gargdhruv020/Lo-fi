@@ -613,7 +613,20 @@ export default function Player() {
     activeTrackIdRef.current = track.id;
     setIsLoadingTrack(true);
 
-    // Keep MediaSession playbackState affirmed as 'playing' during track transitions to prevent notification collapse
+    // Instantly update MediaSession metadata and playbackState for immediate notification update
+    if (typeof window !== "undefined" && "mediaSession" in navigator) {
+      (window as any).__customTrackTitle = track.title;
+      navigator.mediaSession.playbackState = "playing";
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title,
+        artist: track.artist,
+        album: `Lo-Fi Radio — ${track.season === 1 ? "90s & 2000s" : track.season === 2 ? "Retro & Golden Era" : "Modern & Indie"}`,
+        artwork: [
+          { src: track.cover, sizes: "512x512", type: "image/jpeg" },
+        ],
+      });
+    }
+
     getAudioService().affirmPlaybackState(true);
     stopTimeSyncInterval();
 
