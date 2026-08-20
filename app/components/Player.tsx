@@ -48,6 +48,7 @@ export default function Player() {
   const ytPlayerRef = useRef<any>(null);
   const ytContainerRef = useRef<HTMLDivElement | null>(null);
   const timeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const bgAudioRef = useRef<HTMLAudioElement | null>(null);
   const shouldPlayOnReadyRef = useRef(false);
   const queuedVideoIdRef = useRef<string | null>(null);
 
@@ -77,6 +78,58 @@ export default function Player() {
     firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
   }, []);
 
+  const updateMediaSession = () => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator) || !currentTrack) return;
+
+    // Force our metadata to override the YouTube iframe's metadata
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentTrack.title,
+      artist: currentTrack.artist,
+      album: `Lo-Fi Radio — ${currentTrack.season === 1 ? "90s & 2000s" : currentTrack.season === 2 ? "Retro & Golden Era" : "Modern & Indie"}`,
+      artwork: [
+        { src: currentTrack.cover, sizes: "512x512", type: "image/jpeg" },
+      ],
+    });
+
+    // Re-bind action handlers to ensure they point to our controller instead of YouTube's defaults
+    navigator.mediaSession.setActionHandler("play", () => {
+      handlePlayPause();
+    });
+    navigator.mediaSession.setActionHandler("pause", () => {
+      handlePlayPause();
+    });
+    navigator.mediaSession.setActionHandler("previoustrack", () => {
+      if (tracks.length > 0) {
+        const prevId = getSiblingTrackId("prev");
+        const prevTrack = tracks.find((t) => t.id === prevId);
+        if (prevTrack) playTrack(prevTrack);
+      }
+    });
+    navigator.mediaSession.setActionHandler("nexttrack", () => {
+      if (tracks.length > 0) {
+        const nextId = getSiblingTrackId("next");
+        const nextTrack = tracks.find((t) => t.id === nextId);
+        if (nextTrack) playTrack(nextTrack);
+      }
+    });
+    navigator.mediaSession.setActionHandler("seekbackward", () => {
+      const player = ytPlayerRef.current;
+      if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
+        const newTime = Math.max(0, player.getCurrentTime() - 10);
+        player.seekTo(newTime, true);
+        setCurrentTime(newTime);
+      }
+    });
+    navigator.mediaSession.setActionHandler("seekforward", () => {
+      const player = ytPlayerRef.current;
+      if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
+        const newTime = Math.min(player.getDuration() || 0, player.getCurrentTime() + 10);
+        player.seekTo(newTime, true);
+        setCurrentTime(newTime);
+      }
+    });
+  };
+
   const startTimeSyncInterval = () => {
     if (timeIntervalRef.current) clearInterval(timeIntervalRef.current);
     timeIntervalRef.current = setInterval(() => {
@@ -88,6 +141,7 @@ export default function Player() {
           setCurrentTime(player.getCurrentTime() || 0);
           setDuration(player.getDuration() || 0);
           updateMediaPosition();
+          updateMediaSession();
         }
       }
     }, 500);
@@ -207,9 +261,11 @@ export default function Player() {
             const videoIdToPlay = queuedVideoIdRef.current || initialVideoId;
             event.target.loadVideoById(videoIdToPlay);
             event.target.playVideo();
+            bgAudioRef.current?.play().catch(() => {});
             setIsPlaying(true);
             setIsLoadingTrack(false);
             startTimeSyncInterval();
+            updateMediaSession();
             shouldPlayOnReadyRef.current = false;
           }
         },
@@ -217,13 +273,17 @@ export default function Player() {
           // ENDED is 0, PLAYING is 1, PAUSED is 2
           if (event.data === 0) {
             stopTimeSyncInterval();
+            bgAudioRef.current?.pause();
             handleEnded();
           } else if (event.data === 1) {
             setIsPlaying(true);
             setIsLoadingTrack(false);
+            bgAudioRef.current?.play().catch(() => {});
             startTimeSyncInterval();
+            updateMediaSession();
           } else if (event.data === 2) {
             setIsPlaying(false);
+            bgAudioRef.current?.pause();
             stopTimeSyncInterval();
           }
         },
@@ -245,6 +305,7 @@ export default function Player() {
     setIsLoadingTrack(true);
     setIsPlaying(false);
     stopTimeSyncInterval();
+    bgAudioRef.current?.pause();
 
     // Secure browser user-gesture token by executing a play command synchronously
     const player = ytPlayerRef.current;
@@ -256,6 +317,9 @@ export default function Player() {
         playerIsReady = true;
       } catch (e) {}
     }
+
+    // Secure background keep-alive audio permissions synchronously in click handler
+    bgAudioRef.current?.play().then(() => bgAudioRef.current?.pause()).catch(() => {});
 
     // Fetch the YouTube Video ID
     const queryParams = new URLSearchParams({
@@ -280,9 +344,11 @@ export default function Player() {
             // Load and play immediately since the player is ready
             player.loadVideoById(data.videoId);
             player.playVideo();
+            bgAudioRef.current?.play().catch(() => {});
             setIsPlaying(true);
             setIsLoadingTrack(false);
             startTimeSyncInterval();
+            updateMediaSession();
           } else {
             // Queue it for when the player becomes ready
             queuedVideoIdRef.current = data.videoId;
@@ -450,12 +516,15 @@ export default function Player() {
       // State 1 is playing
       if (state === 1) {
         ytPlayerRef.current.pauseVideo();
+        bgAudioRef.current?.pause();
         setIsPlaying(false);
         stopTimeSyncInterval();
       } else {
         ytPlayerRef.current.playVideo();
+        bgAudioRef.current?.play().catch(() => {});
         setIsPlaying(true);
         startTimeSyncInterval();
+        updateMediaSession();
       }
     } catch (err) {
       console.warn("Direct play toggle failed, re-initializing track:", err);
@@ -565,6 +634,14 @@ export default function Player() {
       <div className="fixed -left-[9999px] top-0 w-[200px] h-[200px] opacity-0 pointer-events-none z-0">
         <div ref={ytContainerRef} />
       </div>
+
+      {/* Background Audio Keep-Alive Loop for Mobile Lock Screen & Bluetooth */}
+      <audio
+        ref={bgAudioRef}
+        src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAAA"
+        loop
+        className="hidden"
+      />
 
       {/* ========================================================================= */}
       {/* EXPANDABLE HUSTLE CATALOG PANEL */}
