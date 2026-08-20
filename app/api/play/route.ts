@@ -107,8 +107,7 @@ export async function GET(request: NextRequest) {
     try {
       const rawAudioUrl = await getAudioUrl(videoId);
       if (rawAudioUrl) {
-        const origin = request.nextUrl.origin;
-        audioUrl = `${origin}/api/stream?url=${encodeURIComponent(rawAudioUrl)}`;
+        audioUrl = `/api/stream?url=${encodeURIComponent(rawAudioUrl)}`;
       }
     } catch {
       // Non-critical: audioUrl stays null, client falls back to YouTube iframe

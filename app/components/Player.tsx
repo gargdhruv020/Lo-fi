@@ -575,7 +575,7 @@ export default function Player() {
         ref={audioRef}
         preload="auto"
         playsInline
-        className="hidden"
+        className="sr-only opacity-0 w-0 h-0 pointer-events-none absolute"
         onPlay={handleNativePlay}
         onPause={handleNativePause}
         onTimeUpdate={handleNativeTimeUpdate}
