@@ -277,7 +277,6 @@ export default function Player() {
           setCurrentTime(audio.currentTime || 0);
           setDuration(audio.duration || 0);
           updateMediaPosition();
-          updateMediaSession();
         }
       } else {
         // YouTube iframe is the active engine
@@ -288,7 +287,6 @@ export default function Player() {
             setCurrentTime(player.getCurrentTime() || 0);
             setDuration(player.getDuration() || 0);
             updateMediaPosition();
-            updateMediaSession();
           }
         }
       }
@@ -318,20 +316,10 @@ export default function Player() {
     tracksRef.current = tracks;
   }, [tracks]);
 
-  // Initialize tracks and starting track on client mount (preventing SSR hydration mismatches)
+  // Initialize tracks on client mount (preventing SSR hydration mismatches)
   useEffect(() => {
-    // Defer state updates to next tick to avoid synchronous cascading renders linter warning
-    const timer = setTimeout(() => {
-      setTracks(catalog);
-      tracksRef.current = catalog;
-      if (catalog.length > 0) {
-        setCurrentTrackId(catalog[0].id);
-        setCurrentIndex(0);
-        currentIndexRef.current = 0;
-      }
-    }, 0);
-
-    return () => clearTimeout(timer);
+    setTracks(catalog);
+    tracksRef.current = catalog;
   }, [catalog]);
 
   // Click outside to close catalog drawer automatically
@@ -462,7 +450,7 @@ export default function Player() {
     if (playPromise) {
       playPromise
         .then(() => {
-          if (activeTrackIdRef.current === activeTrackIdRef.current) {
+          if (activeTrackIdRef.current) {
             setIsPlaying(true);
             setIsLoadingTrack(false);
             startTimeSyncInterval();
