@@ -12,24 +12,47 @@
 body {
   background: var(--background);
   color: var(--foreground);
+  overflow-x: hidden;
 }
 
-/* Background image config */
+/* Background image config — crisp responsive scaling across all viewports */
 .hero-bg {
   background-image: url('/lofi-bg.jpg');
   background-repeat: no-repeat;
   background-attachment: fixed;
-  /* Portrait (mobile): image is naturally tall, cover fills perfectly */
-  background-size: cover;
   background-position: center center;
+  background-size: cover;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  transition: background-size 0.3s ease, background-position 0.3s ease;
 }
 
-/* Landscape (desktop/tablet): stretch to fill the full width without cropping */
-@media (orientation: landscape) {
+/* Mobile Portrait View (max-width: 768px in portrait) */
+@media (max-width: 768px) and (orientation: portrait) {
   .hero-bg {
-    background-size: 100% 100%;
+    background-size: cover;
     background-position: center center;
+    min-height: 100dvh;
+    height: 100dvh;
   }
+}
+
+/* Mobile Landscape & Desktop / Desktop Site Mode */
+@media (min-width: 769px), (orientation: landscape) {
+  .hero-bg {
+    background-size: cover;
+    background-position: center center;
+    min-height: 100dvh;
+    height: 100dvh;
+  }
+}
+
+/* Dynamic viewport height helper */
+.dynamic-viewport {
+  min-height: 100vh;
+  min-height: 100dvh;
+  height: 100dvh;
 }
 
 /* Grain overlay config */
@@ -51,12 +74,12 @@ body {
   animation: spin 8s linear infinite;
 }
 
-/* Custom scrollbars / utility classes if needed */
+/* Custom scrollbars / utility classes */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
-/* Custom range slider styling matching the user's pink/purple thumb design */
+/* Custom range slider styling */
 .custom-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -74,7 +97,7 @@ body {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #f43f5e; /* Rose-500 pink/purple color */
+  background: #f43f5e;
   border: 2px solid #ffffff;
   box-shadow: 0 0 6px rgba(244, 63, 94, 0.8);
   transition: transform 0.1s ease;
@@ -99,7 +122,7 @@ body {
   transform: scale(1.2);
 }
 
-/* Glassmorphic scrollbar styling to make scrollbars transparent and match list background */
+/* Glassmorphic scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

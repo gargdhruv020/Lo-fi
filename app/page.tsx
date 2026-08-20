@@ -7,16 +7,9 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export default function Home() {
   return (
-    <main className="relative flex min-h-dvh flex-1 flex-col items-center justify-between overflow-hidden">
-      {/* 1. Fixed background image — uses object-fit for perfect portrait+landscape on all devices */}
-      <div className="fixed inset-0 -z-20">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/lofi-bg.jpg"
-          alt=""
-          className="w-full h-full object-cover object-center"
-          style={{ display: "block" }}
-        />
+    <main className="relative flex min-h-dvh h-dvh w-full flex-1 flex-col items-center justify-between overflow-x-hidden overflow-y-auto sm:overflow-hidden select-none bg-black text-white">
+      {/* 1. Fixed background container with responsive cover & dynamic 100dvh units */}
+      <div className="fixed inset-0 -z-20 h-dvh w-full hero-bg pointer-events-none">
         {/* Spotlight curtain overlay gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/60" />
       </div>
@@ -43,8 +36,6 @@ export default function Home() {
           <ListenerCount />
         </div>
       </div>
-
-
 
       {/* 4. Bottom-anchored Glass Player */}
       <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-full max-w-xl px-4 z-30 flex justify-center">
