@@ -113,10 +113,11 @@ export default function Player() {
 
   // Catalog panel states
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
-  const [activeSeason, setActiveSeason] = useState<number | "all" | "favourites">("favourites");
+  const [activeSeason, setActiveSeason] = useState<number | "all" | "favourites">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const playerRef = useRef<HTMLDivElement | null>(null);
+  const catalogListRef = useRef<HTMLDivElement | null>(null);
   const isSwappingSource = useRef(false);
   const activeTrackIdRef = useRef(currentTrackId);
   const currentIndexRef = useRef<number>(0);
@@ -415,6 +416,19 @@ export default function Player() {
       console.warn("Failed to save player state to localStorage:", err);
     }
   }, [currentTrackId, currentIndex, currentTime, volume, isMuted, isShuffled]);
+
+  // Auto-scroll catalog drawer to active track whenever catalog is opened or track changes
+  useEffect(() => {
+    if (isCatalogOpen && catalogListRef.current) {
+      const timer = setTimeout(() => {
+        const activeEl = catalogListRef.current?.querySelector(`[data-track-id="${currentTrackId}"]`);
+        if (activeEl) {
+          activeEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [isCatalogOpen, currentTrackId]);
 
   // Initialize tracks and bind Global Audio Service Singleton on client mount
   useEffect(() => {
@@ -1199,15 +1213,16 @@ export default function Player() {
           </div>
 
           {/* Scrollable Tracklist */}
-          <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-1.5 scrollbar-thin">
+          <div ref={catalogListRef} className="flex-1 overflow-y-auto mt-3 pr-1 space-y-1.5 scrollbar-thin">
             {filteredTracks.length > 0 ? (
               filteredTracks.map((track) => (
                 <div
                   key={track.id}
+                  data-track-id={track.id}
                   onClick={() => selectTrack(track)}
                   className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-all border ${
                     currentTrackId === track.id
-                      ? "bg-white/10 border-rose-500/30 text-rose-400"
+                      ? "bg-rose-500/10 border-rose-500/50 text-rose-300 font-semibold shadow-[0_0_14px_rgba(244,63,94,0.2)]"
                       : "bg-transparent border-transparent hover:bg-white/5 text-white/80 hover:text-white"
                   }`}
                 >
