@@ -460,7 +460,26 @@ export default function Player() {
     if (typeof window !== "undefined") {
       const audioService = getAudioService();
       if (audioService.audioElement) {
-        nativeAudioRef.current = audioService.audioElement;
+        const audio = audioService.audioElement;
+        nativeAudioRef.current = audio;
+
+        const handleEndedEvent = () => {
+          stopTimeSyncInterval();
+          handleNext();
+        };
+
+        const handleErrorEvent = () => {
+          console.warn("Native audio error encountered, advancing to next track.");
+          handleNext();
+        };
+
+        audio.addEventListener("ended", handleEndedEvent);
+        audio.addEventListener("error", handleErrorEvent);
+
+        return () => {
+          audio.removeEventListener("ended", handleEndedEvent);
+          audio.removeEventListener("error", handleErrorEvent);
+        };
       }
     }
   }, [catalog]);
