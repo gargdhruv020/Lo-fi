@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { getHustleCatalog, CatalogTrack } from "../data/catalog";
+import { getAudioService } from "../services/audioService";
 
 export default function Player() {
   // Load entire catalog
@@ -322,10 +323,19 @@ export default function Player() {
     tracksRef.current = tracks;
   }, [tracks]);
 
-  // Initialize tracks on client mount (preventing SSR hydration mismatches)
+  // Initialize tracks and bind Global Audio Service Singleton on client mount
   useEffect(() => {
     setTracks(catalog);
     tracksRef.current = catalog;
+    if (typeof window !== "undefined") {
+      const audioService = getAudioService();
+      if (audioService.audioElement) {
+        nativeAudioRef.current = audioService.audioElement;
+      }
+      if (audioService.bgAudioElement) {
+        bgAudioRef.current = audioService.bgAudioElement;
+      }
+    }
   }, [catalog]);
 
   // Click outside to close catalog drawer automatically
@@ -696,24 +706,9 @@ export default function Player() {
     };
   }, []);
 
-  // Sync Media Session playback state, Wake Lock, Audio Context, Silent Node & Background Worker
+  // Sync Media Session playback state, Wake Lock, Audio Context & Background Worker via Global Audio Service
   useEffect(() => {
-    if (typeof window !== "undefined" && "mediaSession" in navigator) {
-      navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
-    }
-
-    if (isPlaying) {
-      (window as any).__isPlayingRequested = true;
-      requestWakeLock();
-      ensureAudioContext();
-      startSilentAudioNode();
-      bgWorkerRef.current?.postMessage("start");
-    } else {
-      (window as any).__isPlayingRequested = false;
-      releaseWakeLock();
-      stopSilentAudioNode();
-      bgWorkerRef.current?.postMessage("stop");
-    }
+    getAudioService().setPlaybackState(isPlaying);
   }, [isPlaying]);
 
   // Handle tab visibility restoration: re-acquire Screen Wake Lock & resume Audio Context whenever document.hidden becomes false
