@@ -337,8 +337,9 @@ export default function Player() {
     }
   }, [currentTrack]);
 
-  // Native HTML5 Audio Event Handlers
+  // Native HTML5 Audio Event Handlers with Diagnostic Logging
   const handleNativePlay = () => {
+    console.log("=== AUDIO EVENT: play ===");
     setIsPlaying(true);
     setIsLoadingTrack(false);
     if (typeof window !== "undefined" && "mediaSession" in navigator) {
@@ -347,6 +348,7 @@ export default function Player() {
   };
 
   const handleNativePause = () => {
+    console.log("=== AUDIO EVENT: pause ===");
     setIsPlaying(false);
     if (typeof window !== "undefined" && "mediaSession" in navigator) {
       navigator.mediaSession.playbackState = "paused";
@@ -360,19 +362,34 @@ export default function Player() {
   };
 
   const handleNativeLoadedMetadata = () => {
+    console.log("=== AUDIO EVENT: loadedmetadata ===", { duration: audioRef.current?.duration });
     if (audioRef.current) {
       setDuration(audioRef.current.duration || 0);
     }
   };
 
   const handleNativeEnded = () => {
+    console.log("=== AUDIO EVENT: ended ===");
     handleNext();
   };
 
   const handleNativeError = (e: any) => {
-    console.error("HTML5 Audio playback error:", e);
+    const errObj = audioRef.current?.error;
+    console.error("=== AUDIO EVENT: error ===", {
+      code: errObj?.code,
+      message: errObj?.message,
+      errorCodeMapped:
+        errObj?.code === 1
+          ? "MEDIA_ERR_ABORTED"
+          : errObj?.code === 2
+          ? "MEDIA_ERR_NETWORK"
+          : errObj?.code === 3
+          ? "MEDIA_ERR_DECODE"
+          : errObj?.code === 4
+          ? "MEDIA_ERR_SRC_NOT_SUPPORTED"
+          : "UNKNOWN",
+    });
     setIsLoadingTrack(false);
-    handleNext();
   };
 
   // Centralized playTrack method
@@ -392,52 +409,66 @@ export default function Player() {
     // Update Media Session metadata immediately
     updateMediaSessionMetadata(track);
 
-    // Fetch stream URL
-    const queryParams = new URLSearchParams({
-      id: track.id,
-      title: track.title,
-      artist: track.artist,
-      season: String(track.season),
-    });
+    let targetUrl = track.url; // High-availability fallback MP3 URL
 
     try {
+      const queryParams = new URLSearchParams({
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        season: String(track.season),
+      });
+
       const res = await fetch(`/api/play?${queryParams.toString()}`);
       const data = await res.json();
 
-      if (activeTrackIdRef.current !== track.id) return;
-
-      if (data.audioUrl && audioRef.current) {
-        useNativeAudioRef.current = true;
-        const audio = audioRef.current;
-        audio.src = data.audioUrl;
-        audio.volume = isMuted ? 0 : volume;
-        audio.load();
-
-        try {
-          await audio.play();
-          console.log("AUDIO PLAY SUCCESS", {
-            src: audio.src,
-            currentSrc: audio.currentSrc,
-            readyState: audio.readyState,
-            networkState: audio.networkState,
-            paused: audio.paused,
-            duration: audio.duration,
-          });
-        } catch (err: any) {
-          console.error("AUDIO PLAY FAILED", {
-            name: err?.name,
-            message: err?.message,
-            src: audio.src,
-            readyState: audio.readyState,
-          });
-          setIsLoadingTrack(false);
-        }
-      } else {
-        console.warn("No direct audio URL returned for track:", track.title);
-        setIsLoadingTrack(false);
+      if (data && data.audioUrl) {
+        targetUrl = data.audioUrl;
       }
     } catch (err) {
-      console.error("API play request failed:", err);
+      console.warn("API play route call failed, using direct track fallback URL:", err);
+    }
+
+    if (activeTrackIdRef.current !== track.id) return;
+
+    if (targetUrl && audioRef.current) {
+      useNativeAudioRef.current = true;
+      const audio = audioRef.current;
+      audio.src = targetUrl;
+      audio.volume = isMuted ? 0 : volume;
+      audio.load();
+
+      console.log("=== MOBILE PLAY DEBUG ===", {
+        src: audio.src,
+        currentSrc: audio.currentSrc,
+        readyState: audio.readyState,
+        networkState: audio.networkState,
+        paused: audio.paused,
+        ended: audio.ended,
+        muted: audio.muted,
+        volume: audio.volume,
+        duration: audio.duration,
+      });
+
+      try {
+        await audio.play();
+        console.log("=== AUDIO PLAY SUCCESS ===", {
+          src: audio.src,
+          currentSrc: audio.currentSrc,
+          readyState: audio.readyState,
+        });
+      } catch (err: any) {
+        console.error("=== AUDIO PLAY FAILED ===", {
+          name: err?.name,
+          message: err?.message,
+          src: audio.src,
+          readyState: audio.readyState,
+          error: audio.error ? { code: audio.error.code, message: audio.error.message } : null,
+        });
+        setIsLoadingTrack(false);
+      }
+    } else {
+      console.warn("No target audio URL available for track:", track.title);
       setIsLoadingTrack(false);
     }
   };
@@ -570,19 +601,31 @@ export default function Player() {
 
   return (
     <div ref={playerRef} className="w-full flex flex-col gap-3.5 transition-all duration-300">
-      {/* 1 Persistent HTML5 Audio Element */}
-      <audio
-        ref={audioRef}
-        preload="auto"
-        playsInline
-        className="sr-only opacity-0 w-0 h-0 pointer-events-none absolute"
-        onPlay={handleNativePlay}
-        onPause={handleNativePause}
-        onTimeUpdate={handleNativeTimeUpdate}
-        onLoadedMetadata={handleNativeLoadedMetadata}
-        onEnded={handleNativeEnded}
-        onError={handleNativeError}
-      />
+      {/* Native HTML5 Audio Element with Visible Controls for Mobile Diagnostics */}
+      <div className="w-full flex justify-center px-4 py-1">
+        <audio
+          ref={audioRef}
+          preload="auto"
+          playsInline
+          controls
+          className="w-full max-w-md my-1 z-50 rounded-lg shadow-md"
+          onPlay={handleNativePlay}
+          onPause={handleNativePause}
+          onTimeUpdate={handleNativeTimeUpdate}
+          onLoadedMetadata={handleNativeLoadedMetadata}
+          onEnded={handleNativeEnded}
+          onError={handleNativeError}
+          onLoadStart={() => console.log("=== AUDIO EVENT: loadstart ===")}
+          onLoadedData={() => console.log("=== AUDIO EVENT: loadeddata ===")}
+          onCanPlay={() => console.log("=== AUDIO EVENT: canplay ===")}
+          onCanPlayThrough={() => console.log("=== AUDIO EVENT: canplaythrough ===")}
+          onWaiting={() => console.log("=== AUDIO EVENT: waiting ===")}
+          onStalled={() => console.log("=== AUDIO EVENT: stalled ===")}
+          onSuspend={() => console.log("=== AUDIO EVENT: suspend ===")}
+          onAbort={() => console.log("=== AUDIO EVENT: abort ===")}
+          onEmptied={() => console.log("=== AUDIO EVENT: emptied ===")}
+        />
+      </div>
 
       {/* Hidden YouTube Iframe Container */}
       <div className="fixed -left-[9999px] top-0 w-[200px] h-[200px] opacity-0 pointer-events-none z-0">
