@@ -55,6 +55,46 @@ export default function Player() {
   // Load YouTube Iframe Player API script dynamically on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    // Intercept MediaSession calls to prevent YouTube iframe from hijacking controls
+    if ("mediaSession" in navigator) {
+      const originalSetActionHandler = navigator.mediaSession.setActionHandler;
+      navigator.mediaSession.setActionHandler = function (action, callback) {
+        // Prevent clearing next/prev track action handlers
+        if ((action === "nexttrack" || action === "previoustrack") && !callback) {
+          return;
+        }
+        return originalSetActionHandler.call(navigator.mediaSession, action, callback);
+      };
+
+      // Intercept metadata sets to prevent YouTube from replacing our song info
+      try {
+        const mediaSessionProto = Object.getPrototypeOf(navigator.mediaSession);
+        const originalDescriptor = Object.getOwnPropertyDescriptor(mediaSessionProto, "metadata");
+        if (originalDescriptor && originalDescriptor.set) {
+          Object.defineProperty(navigator.mediaSession, "metadata", {
+            configurable: true,
+            enumerable: true,
+            get() {
+              return originalDescriptor.get ? originalDescriptor.get.call(this) : null;
+            },
+            set(value) {
+              // If the metadata is from YouTube (does not match our current track title), block it!
+              if (
+                (window as any).__customTrackTitle &&
+                value &&
+                value.title !== (window as any).__customTrackTitle
+              ) {
+                return;
+              }
+              return originalDescriptor.set!.call(this, value);
+            },
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to patch mediaSession.metadata descriptor:", err);
+      }
+    }
     
     const initOnScriptLoad = () => {
       if ((window as any).YT && (window as any).YT.Player) {
@@ -80,6 +120,8 @@ export default function Player() {
 
   const updateMediaSession = () => {
     if (typeof window === "undefined" || !("mediaSession" in navigator) || !currentTrack) return;
+
+    (window as any).__customTrackTitle = currentTrack.title;
 
     // Force our metadata to override the YouTube iframe's metadata
     navigator.mediaSession.metadata = new MediaMetadata({
