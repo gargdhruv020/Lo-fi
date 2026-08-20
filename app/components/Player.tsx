@@ -377,6 +377,11 @@ export default function Player() {
     }
   };
 
+  const currentTimeRef = useRef(currentTime);
+  const volumeRef = useRef(volume);
+  const isMutedRef = useRef(isMuted);
+  const isShuffledRef = useRef(isShuffled);
+
   useEffect(() => {
     return () => stopTimeSyncInterval();
   }, []);
@@ -390,26 +395,41 @@ export default function Player() {
   }, [currentIndex]);
 
   useEffect(() => {
-    tracksRef.current = tracks;
-  }, [tracks]);
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
 
-  // Save Player State to LocalStorage on track, time, or control changes
   useEffect(() => {
-    if (typeof window === "undefined" || !currentTrackId) return;
+    volumeRef.current = volume;
+  }, [volume]);
 
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  useEffect(() => {
+    isShuffledRef.current = isShuffled;
+  }, [isShuffled]);
+
+  // Save Player State to LocalStorage safely using synchronized refs (prevents background stale closure reverts)
+  const savePlayerState = (overrideTime?: number) => {
+    if (typeof window === "undefined" || !activeTrackIdRef.current) return;
     try {
       const stateToSave = {
-        trackId: currentTrackId,
-        index: currentIndex,
-        currentTime: currentTime,
-        volume: volume,
-        isMuted: isMuted,
-        isShuffled: isShuffled,
+        trackId: activeTrackIdRef.current,
+        index: currentIndexRef.current,
+        currentTime: typeof overrideTime === "number" ? overrideTime : currentTimeRef.current,
+        volume: volumeRef.current,
+        isMuted: isMutedRef.current,
+        isShuffled: isShuffledRef.current,
       };
       localStorage.setItem("lofi_player_state", JSON.stringify(stateToSave));
     } catch (err) {
       console.warn("Failed to save player state to localStorage:", err);
     }
+  };
+
+  useEffect(() => {
+    savePlayerState();
   }, [currentTrackId, currentIndex, currentTime, volume, isMuted, isShuffled]);
 
   // Auto-scroll catalog drawer to active track whenever catalog is opened or track changes
@@ -602,11 +622,19 @@ export default function Player() {
     const idx = explicitIndex !== undefined ? explicitIndex : activePlaylist.findIndex((t) => t.id === track.id);
     const validIndex = idx !== -1 ? idx : 0;
 
-    setCurrentIndex(validIndex);
-    currentIndexRef.current = validIndex;
-    setCurrentTrackId(track.id);
+    // SYNCHRONOUS GROUND TRUTH REFS UPDATE (prevents background stale closure race condition)
     activeTrackIdRef.current = track.id;
+    currentIndexRef.current = validIndex;
+    currentTimeRef.current = 0;
+
+    // REACT STATE DISPATCH
+    setCurrentIndex(validIndex);
+    setCurrentTrackId(track.id);
+    setCurrentTime(0);
     setIsLoadingTrack(true);
+
+    // Save persistent state immediately for the new track
+    savePlayerState(0);
 
     // Instantly update MediaSession metadata and playbackState for immediate notification update
     if (typeof window !== "undefined" && "mediaSession" in navigator) {
