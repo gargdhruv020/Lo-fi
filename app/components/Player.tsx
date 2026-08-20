@@ -35,7 +35,7 @@ export default function Player() {
   const [isMuted, setIsMuted] = useState(false);
   const [isSeeking, setIsSeeking] = useState(false);
   const [isLoadingTrack, setIsLoadingTrack] = useState(false);
-  const [isShuffled, setIsShuffled] = useState(true);
+  const [isShuffled, setIsShuffled] = useState(false);
 
   // Catalog panel states
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
@@ -91,28 +91,13 @@ export default function Player() {
     activeTrackIdRef.current = currentTrackId;
   }, [currentTrackId]);
 
-  // Randomize track order and starting track on client mount (preventing SSR hydration mismatches)
+  // Initialize tracks and starting track on client mount (preventing SSR hydration mismatches)
   useEffect(() => {
-    const shuffleArray = (arr: CatalogTrack[]): CatalogTrack[] => {
-      const shuffled = [...arr];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        const temp = shuffled[i];
-        shuffled[i] = shuffled[j];
-        shuffled[j] = temp;
-      }
-      return shuffled;
-    };
-
-    const shuffledCatalog = shuffleArray(catalog);
-    
     // Defer state updates to next tick to avoid synchronous cascading renders linter warning
     const timer = setTimeout(() => {
-      setTracks(shuffledCatalog);
-      // Pick the first track of the shuffled catalog as the random starting song
-      if (shuffledCatalog.length > 0) {
-        const startTrack = shuffledCatalog[0];
-        setCurrentTrackId(startTrack.id);
+      setTracks(catalog);
+      if (catalog.length > 0) {
+        setCurrentTrackId(catalog[0].id);
       }
     }, 0);
 
