@@ -461,10 +461,10 @@ export default function Player() {
     };
   }, [isCatalogOpen]);
 
-  // Current track object
+  // Current track object — resolves directly against full catalog to guarantee desktop/mobile UI metadata stays 100% in sync
   const currentTrack = useMemo(() => {
-    return tracks.find((t) => t.id === currentTrackId) || catalog[0];
-  }, [tracks, catalog, currentTrackId]);
+    return catalog.find((t) => t.id === currentTrackId) || tracks.find((t) => t.id === currentTrackId) || catalog[0];
+  }, [catalog, tracks, currentTrackId]);
 
   // Filtered tracks list based on Season and Search query
   const filteredTracks = useMemo(() => {
