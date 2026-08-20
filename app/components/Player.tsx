@@ -277,19 +277,27 @@ export default function Player() {
     firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
   }, []);
 
-  const updateMediaSession = () => {
-    if (typeof window === "undefined" || !("mediaSession" in navigator) || !currentTrack) return;
+  const updateMediaSession = (trackOverride?: CatalogTrack) => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
 
-    (window as any).__customTrackTitle = currentTrack.title;
+    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+    const targetTrack =
+      trackOverride ||
+      activePlaylist.find((t) => t.id === activeTrackIdRef.current) ||
+      currentTrack;
+
+    if (!targetTrack) return;
+
+    (window as any).__customTrackTitle = targetTrack.title;
     navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
 
     // Force our metadata to override the YouTube iframe's metadata
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentTrack.title,
-      artist: currentTrack.artist,
-      album: `Lo-Fi Radio — ${currentTrack.season === 1 ? "90s & 2000s" : currentTrack.season === 2 ? "Retro & Golden Era" : "Modern & Indie"}`,
+      title: targetTrack.title,
+      artist: targetTrack.artist,
+      album: `Lo-Fi Radio — ${targetTrack.season === 1 ? "90s & 2000s" : targetTrack.season === 2 ? "Retro & Golden Era" : "Modern & Indie"}`,
       artwork: [
-        { src: currentTrack.cover, sizes: "512x512", type: "image/jpeg" },
+        { src: targetTrack.cover, sizes: "512x512", type: "image/jpeg" },
       ],
     });
 
@@ -594,7 +602,7 @@ export default function Player() {
   };
 
   // Start playback via YouTube iframe (fallback for desktop / when Invidious fails)
-  const startYoutubePlayback = (videoId: string) => {
+  const startYoutubePlayback = (videoId: string, trackOverride?: CatalogTrack) => {
     useNativeAudioRef.current = false;
     stopNativeAudio();
 
@@ -602,11 +610,10 @@ export default function Player() {
     if (player && typeof player.loadVideoById === "function") {
       player.loadVideoById(videoId);
       player.playVideo();
-      bgAudioRef.current?.play().catch(() => {});
       setIsPlaying(true);
       setIsLoadingTrack(false);
       startTimeSyncInterval();
-      updateMediaSession();
+      updateMediaSession(trackOverride);
     } else {
       // Queue it for when the player becomes ready
       queuedVideoIdRef.current = videoId;
@@ -689,16 +696,16 @@ export default function Player() {
                 setIsPlaying(true);
                 setIsLoadingTrack(false);
                 startTimeSyncInterval();
-                updateMediaSession();
+                updateMediaSession(track);
               }
             })
             .catch(() => {
               console.warn("Native audio failed, falling back to YouTube iframe");
               useNativeAudioRef.current = false;
-              startYoutubePlayback(data.videoId);
+              startYoutubePlayback(data.videoId, track);
             });
         } else {
-          startYoutubePlayback(data.videoId);
+          startYoutubePlayback(data.videoId, track);
         }
       })
       .catch((downloaderErr) => {
