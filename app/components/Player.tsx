@@ -231,7 +231,7 @@ export default function Player() {
         return originalSetActionHandler.call(navigator.mediaSession, action, callback);
       };
 
-      // Intercept metadata sets to prevent YouTube from replacing our song info
+      // Intercept metadata sets to keep track title reference synced
       try {
         const mediaSessionProto = Object.getPrototypeOf(navigator.mediaSession);
         const originalDescriptor = Object.getOwnPropertyDescriptor(mediaSessionProto, "metadata");
@@ -243,13 +243,8 @@ export default function Player() {
               return originalDescriptor.get ? originalDescriptor.get.call(this) : null;
             },
             set(value) {
-              // If the metadata is from YouTube (does not match our current track title), block it!
-              if (
-                (window as any).__customTrackTitle &&
-                value &&
-                value.title !== (window as any).__customTrackTitle
-              ) {
-                return;
+              if (value && value.title) {
+                (window as any).__customTrackTitle = value.title;
               }
               return originalDescriptor.set!.call(this, value);
             },
@@ -833,6 +828,7 @@ export default function Player() {
   useEffect(() => {
     if (!("mediaSession" in navigator) || !currentTrack) return;
 
+    (window as any).__customTrackTitle = currentTrack.title;
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentTrack.title,
       artist: currentTrack.artist,
