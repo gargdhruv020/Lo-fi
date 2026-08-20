@@ -1,7 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exec } from "child_process";
-import fs from "fs";
-import path from "path";
+import https from "https";
+
+// Pure Node.js helper to search YouTube and scrape the first matching video ID
+const searchYoutube = (query: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+    https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        // Find the first video ID in the page source
+        // YouTube embeds search results in a JSON object inside the HTML: ytInitialData
+        const regex = /"videoId":"([a-zA-Z0-9_-]{11})"/;
+        const match = data.match(regex);
+        if (match && match[1]) {
+          resolve(match[1]);
+        } else {
+          // Fallback to simpler watch match
+          const watchRegex = /\/watch\?v=([a-zA-Z0-9_-]{11})/;
+          const watchMatch = data.match(watchRegex);
+          if (watchMatch && watchMatch[1]) {
+            resolve(watchMatch[1]);
+          } else {
+            reject(new Error("Could not find any video ID in search results"));
+          }
+        }
+      });
+    }).on('error', (err) => {
+      reject(err);
+    });
+  });
+};
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -13,60 +46,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
   }
 
-  // Search query on YouTube
   const searchQuery = `${title} ${artist}`;
 
-  // Choose appropriate yt-dlp path based on platform
-  let ytdlpPath = "";
-
-  if (process.platform === "win32") {
-    // Windows Local Path
-    ytdlpPath = `C:\\Users\\NEW BAG COLLECTION\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python311\\Scripts\\yt-dlp.exe`;
-    if (!fs.existsSync(ytdlpPath)) {
-      ytdlpPath = "yt-dlp"; // fallback to global command if path changed
-    }
-  } else {
-    // Linux / Vercel Environment
-    // We copy the committed binary to /tmp and make it executable
-    const committedYtdlp = path.join(process.cwd(), "bin", "yt-dlp");
-    const tmpYtdlp = "/tmp/yt-dlp";
-
-    try {
-      if (!fs.existsSync(tmpYtdlp)) {
-        fs.copyFileSync(committedYtdlp, tmpYtdlp);
-        fs.chmodSync(tmpYtdlp, "755"); // make it executable
-      }
-      ytdlpPath = tmpYtdlp;
-    } catch (err: any) {
-      console.error("Failed to copy yt-dlp binary to /tmp:", err.message);
-      ytdlpPath = "yt-dlp"; // fallback to environment path
-    }
+  try {
+    const videoId = await searchYoutube(searchQuery);
+    return NextResponse.json({ videoId, status: "ready" });
+  } catch (error: any) {
+    console.error(`YouTube search failed for ${searchQuery}:`, error.message);
+    // Return a default fallback video ID if search fails
+    // This is a relaxing lo-fi audio fallback video ID
+    return NextResponse.json({ videoId: "jfKfPfyJRdk", status: "fallback", error: error.message });
   }
-
-  // yt-dlp command to extract the direct HTTPS audio streaming URL (no disk writes!)
-  const cmd = `"${ytdlpPath}" -g -f "ba[ext=m4a]" "ytsearch:${searchQuery}"`;
-
-  const nodePath = process.platform === "win32" ? "C:\\Program Files\\nodejs" : "";
-  const customEnv = {
-    ...process.env,
-    PATH: nodePath ? `${nodePath};${process.env.PATH || ""}` : process.env.PATH || "",
-  };
-
-  return new Promise<NextResponse>((resolve) => {
-    exec(cmd, { env: customEnv }, (error, stdout) => {
-      if (error) {
-        console.error(`yt-dlp stream extraction failed for ${searchQuery}:`, error.message);
-        // Fallback to song1 if download/extraction fails
-        resolve(NextResponse.json({ url: "/audio/song1.mp3", status: "fallback", error: error.message }));
-      } else {
-        const streamUrl = stdout.trim();
-        if (streamUrl && streamUrl.startsWith("http")) {
-          resolve(NextResponse.json({ url: streamUrl, status: "ready" }));
-        } else {
-          console.warn(`yt-dlp returned invalid stream url: ${streamUrl}`);
-          resolve(NextResponse.json({ url: "/audio/song1.mp3", status: "fallback" }));
-        }
-      }
-    });
-  });
 }
