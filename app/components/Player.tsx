@@ -621,7 +621,33 @@ export default function Player() {
     }
   };
 
-  // Centralized playTrack method — tries native audio for mobile background, falls back to YouTube iframe
+  const audioCacheRef = useRef<Record<string, { videoId: string; audioUrl: string | null }>>({});
+
+  // Helper to fetch and cache track audio URL
+  const fetchAndCacheTrack = async (track: CatalogTrack): Promise<{ videoId: string; audioUrl: string | null } | null> => {
+    if (audioCacheRef.current[track.id]) {
+      return audioCacheRef.current[track.id];
+    }
+    try {
+      const queryParams = new URLSearchParams({
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        season: String(track.season),
+      });
+      const res = await fetch(`/api/play?${queryParams.toString()}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.videoId) {
+        const cachedObj = { videoId: data.videoId, audioUrl: data.audioUrl || null };
+        audioCacheRef.current[track.id] = cachedObj;
+        return cachedObj;
+      }
+    } catch (e) {}
+    return null;
+  };
+
+  // Centralized playTrack method — instant playback from cache, fallback to background API fetch
   const playTrack = (track: CatalogTrack, explicitIndex?: number) => {
     if (!track) return;
 
@@ -629,12 +655,12 @@ export default function Player() {
     const idx = explicitIndex !== undefined ? explicitIndex : activePlaylist.findIndex((t) => t.id === track.id);
     const validIndex = idx !== -1 ? idx : 0;
 
-    // SYNCHRONOUS GROUND TRUTH REFS UPDATE (prevents background stale closure race condition)
+    // SYNCHRONOUS GROUND TRUTH REFS UPDATE
     activeTrackIdRef.current = track.id;
     currentIndexRef.current = validIndex;
     currentTimeRef.current = 0;
 
-    // REACT STATE DISPATCH
+    // INSTANT REACT STATE DISPATCH
     setCurrentIndex(validIndex);
     setCurrentTrackId(track.id);
     setCurrentTime(0);
@@ -644,105 +670,73 @@ export default function Player() {
     savePlayerState(0);
 
     // Instantly update MediaSession metadata and playbackState for immediate notification update
-    if (typeof window !== "undefined" && "mediaSession" in navigator) {
-      (window as any).__customTrackTitle = track.title;
-      navigator.mediaSession.playbackState = "playing";
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.title,
-        artist: track.artist,
-        album: `Lo-Fi Radio — ${track.season === 1 ? "90s & 2000s" : track.season === 2 ? "Retro & Golden Era" : "Modern & Indie"}`,
-        artwork: [
-          { src: track.cover, sizes: "512x512", type: "image/jpeg" },
-        ],
-      });
-    }
-
+    updateMediaSession(track);
     getAudioService().affirmPlaybackState(true);
     stopTimeSyncInterval();
-
-    // Synchronously prime / unlock persistent HTML5 audio element on first user gesture
     getAudioService().primeUserGesture();
 
-    // Fetch the YouTube Video ID (and optionally a direct audio URL)
-    const queryParams = new URLSearchParams({
-      id: track.id,
-      title: track.title,
-      artist: track.artist,
-      season: String(track.season),
-    });
+    // Helper to start native or youtube audio from stream data
+    const startStreamPlayback = (data: { videoId: string; audioUrl: string | null }) => {
+      if (activeTrackIdRef.current !== track.id) return;
 
-    fetch(`/api/play?${queryParams.toString()}`)
-      .then((res) => res.json())
-      .then((data) => {
-        // Only proceed if the user is still on this track
-        if (activeTrackIdRef.current !== track.id) return;
+      if (data.audioUrl) {
+        useNativeAudioRef.current = true;
+        stopYoutubePlayer();
 
-        if (!data.videoId) {
-          console.error("No video ID returned from API");
-          setIsLoadingTrack(false);
-          return;
-        }
+        getAudioService()
+          .playSource(data.audioUrl, volumeRef.current, isMutedRef.current)
+          .then(() => {
+            if (activeTrackIdRef.current === track.id) {
+              nativeAudioRef.current = getAudioService().audioElement;
+              setIsPlaying(true);
+              setIsLoadingTrack(false);
+              startTimeSyncInterval();
+              updateMediaSession(track);
+            }
+          })
+          .catch(() => {
+            useNativeAudioRef.current = false;
+            startYoutubePlayback(data.videoId, track);
+          });
+      } else {
+        startYoutubePlayback(data.videoId, track);
+      }
+    };
 
-        // Try native audio first (works in mobile background), fall back to YouTube iframe
-        if (data.audioUrl) {
-          useNativeAudioRef.current = true;
-          stopYoutubePlayer();
+    // 1. INSTANT PLAYBACK: If stream is already in cache, start playing immediately (0ms delay)
+    if (audioCacheRef.current[track.id]) {
+      startStreamPlayback(audioCacheRef.current[track.id]);
+      return;
+    }
 
-          getAudioService()
-            .playSource(data.audioUrl, volume, isMuted)
-            .then(() => {
-              if (activeTrackIdRef.current === track.id) {
-                nativeAudioRef.current = getAudioService().audioElement;
-                setIsPlaying(true);
-                setIsLoadingTrack(false);
-                startTimeSyncInterval();
-                updateMediaSession(track);
-              }
-            })
-            .catch(() => {
-              console.warn("Native audio failed, falling back to YouTube iframe");
-              useNativeAudioRef.current = false;
-              startYoutubePlayback(data.videoId, track);
-            });
-        } else {
-          startYoutubePlayback(data.videoId, track);
-        }
-      })
-      .catch((downloaderErr) => {
-        console.error("Downloader API failed:", downloaderErr);
+    // 2. Async fetch fallback if not yet in cache
+    fetchAndCacheTrack(track).then((data) => {
+      if (data) {
+        startStreamPlayback(data);
+      } else {
         setIsLoadingTrack(false);
-      });
+      }
+    });
   };
 
-  // Predictive prefetching for next and previous tracks in the background
+  // Aggressive prefetching for incoming next and previous tracks in the background
   useEffect(() => {
     if (tracks.length === 0 || !currentTrack) return;
 
-    // Helper to request a download in the background without blocking the UI
-    const prefetchTrack = (track: CatalogTrack) => {
-      const queryParams = new URLSearchParams({
-        id: track.id,
-        title: track.title,
-        artist: track.artist,
-        season: String(track.season),
-      });
-      fetch(`/api/play?${queryParams.toString()}`).catch(() => {});
-    };
+    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+    if (activePlaylist.length === 0) return;
 
-    // Wait 1.5 seconds of continuous playback before prefetching (to avoid spamming skips)
     const prefetchTimer = setTimeout(() => {
-      const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
-      if (activePlaylist.length === 0) return;
-
-      const nextIndex = (currentIndexRef.current + 1) % activePlaylist.length;
-      const prevIndex = (currentIndexRef.current - 1 + activePlaylist.length) % activePlaylist.length;
-
-      const nextTrack = activePlaylist[nextIndex];
-      const prevTrack = activePlaylist[prevIndex];
-
-      if (nextTrack) prefetchTrack(nextTrack);
-      if (prevTrack) prefetchTrack(prevTrack);
-    }, 1500);
+      const currentIdx = currentIndexRef.current;
+      // Prefetch next 3 tracks and previous 2 tracks
+      for (const offset of [1, 2, 3, -1, -2]) {
+        const targetIdx = (currentIdx + offset + activePlaylist.length) % activePlaylist.length;
+        const targetTrack = activePlaylist[targetIdx];
+        if (targetTrack && !audioCacheRef.current[targetTrack.id]) {
+          fetchAndCacheTrack(targetTrack);
+        }
+      }
+    }, 400);
 
     return () => clearTimeout(prefetchTimer);
   }, [currentTrackId, tracks, catalog]);
