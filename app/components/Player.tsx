@@ -48,11 +48,28 @@ export default function Player() {
   const ytPlayerRef = useRef<any>(null);
   const ytContainerRef = useRef<HTMLDivElement | null>(null);
   const timeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const shouldPlayOnReadyRef = useRef(false);
+  const queuedVideoIdRef = useRef<string | null>(null);
 
   // Load YouTube Iframe Player API script dynamically on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if ((window as any).YT) return;
+    
+    const initOnScriptLoad = () => {
+      if ((window as any).YT && (window as any).YT.Player) {
+        initYoutubePlayer("jfKfPfyJRdk");
+      }
+    };
+
+    if ((window as any).YT) {
+      initOnScriptLoad();
+      return;
+    }
+
+    // Setup global callback for YouTube script
+    (window as any).onYouTubeIframeAPIReady = () => {
+      initOnScriptLoad();
+    };
     
     const tag = document.createElement("script");
     tag.src = "https://www.youtube.com/iframe_api";
@@ -174,7 +191,7 @@ export default function Player() {
       width: "200",
       videoId: initialVideoId,
       playerVars: {
-        autoplay: 1,
+        autoplay: 0, // Disable automatic play on instantiation to respect security policies
         controls: 0,
         disablekb: 1,
         fs: 0,
@@ -186,10 +203,15 @@ export default function Player() {
       events: {
         onReady: (event: any) => {
           event.target.setVolume(isMuted ? 0 : volume * 100);
-          event.target.playVideo();
-          setIsPlaying(true);
-          setIsLoadingTrack(false);
-          startTimeSyncInterval();
+          if (shouldPlayOnReadyRef.current) {
+            const videoIdToPlay = queuedVideoIdRef.current || initialVideoId;
+            event.target.loadVideoById(videoIdToPlay);
+            event.target.playVideo();
+            setIsPlaying(true);
+            setIsLoadingTrack(false);
+            startTimeSyncInterval();
+            shouldPlayOnReadyRef.current = false;
+          }
         },
         onStateChange: (event: any) => {
           // ENDED is 0, PLAYING is 1, PAUSED is 2
@@ -224,29 +246,18 @@ export default function Player() {
     setIsPlaying(false);
     stopTimeSyncInterval();
 
-    // 1. Synchronously initialize or activate the player with a loading video ID
-    // to claim the user gesture permission token immediately in the click stack!
-    if (!ytPlayerRef.current) {
-      if ((window as any).YT && (window as any).YT.Player) {
-        initYoutubePlayer("jfKfPfyJRdk"); // load default lo-fi track to claim gesture
-      } else {
-        // Wait for YT script and initialize
-        const checkYT = setInterval(() => {
-          if ((window as any).YT && (window as any).YT.Player) {
-            clearInterval(checkYT);
-            initYoutubePlayer("jfKfPfyJRdk");
-          }
-        }, 50);
-      }
-    } else {
-      // Secure the gesture by calling play/pause on the existing player synchronously
+    // Secure browser user-gesture token by executing a play command synchronously
+    const player = ytPlayerRef.current;
+    let playerIsReady = false;
+    if (player && typeof player.playVideo === "function") {
       try {
-        ytPlayerRef.current.playVideo();
-        ytPlayerRef.current.pauseVideo();
+        player.playVideo();
+        player.pauseVideo();
+        playerIsReady = true;
       } catch (e) {}
     }
 
-    // 2. Fetch the YouTube Video ID
+    // Fetch the YouTube Video ID
     const queryParams = new URLSearchParams({
       id: track.id,
       title: track.title,
@@ -265,21 +276,18 @@ export default function Player() {
             return;
           }
 
-          const playVideo = () => {
-            const player = ytPlayerRef.current;
-            if (player && typeof player.loadVideoById === "function") {
-              player.loadVideoById(data.videoId);
-              player.playVideo();
-              setIsPlaying(true);
-              setIsLoadingTrack(false);
-              startTimeSyncInterval();
-            } else {
-              console.warn("YouTube player not ready, retrying in 100ms...");
-              setTimeout(playVideo, 100);
-            }
-          };
-
-          playVideo();
+          if (playerIsReady && player && typeof player.loadVideoById === "function") {
+            // Load and play immediately since the player is ready
+            player.loadVideoById(data.videoId);
+            player.playVideo();
+            setIsPlaying(true);
+            setIsLoadingTrack(false);
+            startTimeSyncInterval();
+          } else {
+            // Queue it for when the player becomes ready
+            queuedVideoIdRef.current = data.videoId;
+            shouldPlayOnReadyRef.current = true;
+          }
         }
       })
       .catch((downloaderErr) => {
