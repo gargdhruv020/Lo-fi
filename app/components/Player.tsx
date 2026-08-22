@@ -315,10 +315,16 @@ export default function Player() {
       handlePlayPause();
     });
     safeSetAction("pause", () => {
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.playbackState = "paused";
+      getAudioService().setPlaybackState(false);
+      if (nativeAudioRef.current) {
+        nativeAudioRef.current.pause();
       }
-      handlePlayPause();
+      const audioSingleton = getAudioService().audioElement;
+      if (audioSingleton) {
+        audioSingleton.pause();
+      }
+      setIsPlaying(false);
+      stopTimeSyncInterval();
     });
     safeSetAction("stop", () => {
       if (useNativeAudioRef.current && nativeAudioRef.current) {
@@ -914,10 +920,16 @@ export default function Player() {
       handlePlayPause();
     });
     safeSetAction("pause", () => {
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.playbackState = "paused";
+      getAudioService().setPlaybackState(false);
+      if (nativeAudioRef.current) {
+        nativeAudioRef.current.pause();
       }
-      handlePlayPause();
+      const audioSingleton = getAudioService().audioElement;
+      if (audioSingleton) {
+        audioSingleton.pause();
+      }
+      setIsPlaying(false);
+      stopTimeSyncInterval();
     });
     safeSetAction("stop", () => {
       if (useNativeAudioRef.current && nativeAudioRef.current) {
