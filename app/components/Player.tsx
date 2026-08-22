@@ -981,8 +981,11 @@ export default function Player() {
     getAudioService().primeUserGesture();
 
     if (!isPlaying) {
-      // If native audio already has a source set and paused, resume playback directly
-      if (useNativeAudioRef.current && nativeAudioRef.current && nativeAudioRef.current.src) {
+      const src = nativeAudioRef.current?.src || "";
+      const isRealTrackUrl = src.startsWith("http://") || src.startsWith("https://") || src.startsWith("blob:");
+
+      // If native audio already has a real song URL set and paused, resume playback directly
+      if (useNativeAudioRef.current && nativeAudioRef.current && isRealTrackUrl) {
         const audio = nativeAudioRef.current;
         getAudioService().setPlaybackState(true);
         audio

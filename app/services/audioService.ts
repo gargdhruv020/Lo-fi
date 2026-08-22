@@ -42,11 +42,12 @@ class AudioService {
     return AudioService.instance;
   }
 
-  // Synchronously prime / unlock audio element on first user gesture (fix first-click mobile issue)
+  // Synchronously prime / unlock audio element on first user gesture using silent audio data URI
   public primeUserGesture(): void {
     if (this.audioElement) {
       this.ensureAudioContext();
       if (!this.audioElement.src || this.audioElement.src === "" || this.audioElement.src === window.location.href) {
+        this.audioElement.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
         const p = this.audioElement.play();
         if (p) {
           p.then(() => {
