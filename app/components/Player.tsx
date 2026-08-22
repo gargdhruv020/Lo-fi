@@ -307,7 +307,7 @@ export default function Player() {
       } catch (e) {}
     };
 
-    // Re-bind action handlers for Bluetooth earbuds & system media controls
+    // Re-bind action handlers: single tap strictly toggles Play/Pause, double tap switches Next/Prev
     safeSetAction("play", () => {
       if ("mediaSession" in navigator) {
         navigator.mediaSession.playbackState = "playing";
@@ -346,12 +346,20 @@ export default function Player() {
       handleNext();
     });
     safeSetAction("seekbackward", () => {
-      getAudioService().affirmPlaybackState(true);
-      handlePrev();
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        const newTime = Math.max(0, nativeAudioRef.current.currentTime - 10);
+        nativeAudioRef.current.currentTime = newTime;
+        setCurrentTime(newTime);
+        updateMediaPosition();
+      }
     });
     safeSetAction("seekforward", () => {
-      getAudioService().affirmPlaybackState(true);
-      handleNext();
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        const newTime = Math.min(nativeAudioRef.current.duration || 0, nativeAudioRef.current.currentTime + 10);
+        nativeAudioRef.current.currentTime = newTime;
+        setCurrentTime(newTime);
+        updateMediaPosition();
+      }
     });
     safeSetAction("seekto", (details: any) => {
       if (typeof details.seekTime === "number" && !isNaN(details.seekTime)) {
@@ -934,12 +942,20 @@ export default function Player() {
       handleNext();
     });
     safeSetAction("seekbackward", () => {
-      getAudioService().affirmPlaybackState(true);
-      handlePrev();
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        const newTime = Math.max(0, nativeAudioRef.current.currentTime - 10);
+        nativeAudioRef.current.currentTime = newTime;
+        setCurrentTime(newTime);
+        updateMediaPosition();
+      }
     });
     safeSetAction("seekforward", () => {
-      getAudioService().affirmPlaybackState(true);
-      handleNext();
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        const newTime = Math.min(nativeAudioRef.current.duration || 0, nativeAudioRef.current.currentTime + 10);
+        nativeAudioRef.current.currentTime = newTime;
+        setCurrentTime(newTime);
+        updateMediaPosition();
+      }
     });
     safeSetAction("seekto", (details: any) => {
       if (typeof details.seekTime === "number" && !isNaN(details.seekTime)) {
