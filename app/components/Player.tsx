@@ -301,28 +301,57 @@ export default function Player() {
       ],
     });
 
-    // Re-bind action handlers to ensure they point to our controller instead of YouTube's defaults
-    navigator.mediaSession.setActionHandler("play", () => {
+    const safeSetAction = (action: string, handler: any) => {
+      try {
+        navigator.mediaSession.setActionHandler(action as any, handler);
+      } catch (e) {}
+    };
+
+    // Re-bind action handlers to ensure they point to our controller (iOS WebKit requires seekto to show Next/Prev)
+    safeSetAction("play", () => {
       if ("mediaSession" in navigator) {
         navigator.mediaSession.playbackState = "playing";
       }
       handlePlayPause();
     });
-    navigator.mediaSession.setActionHandler("pause", () => {
+    safeSetAction("pause", () => {
       if ("mediaSession" in navigator) {
         navigator.mediaSession.playbackState = "paused";
       }
       handlePlayPause();
     });
-    navigator.mediaSession.setActionHandler("previoustrack", () => {
+    safeSetAction("stop", () => {
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        nativeAudioRef.current.pause();
+      }
+      getAudioService().setPlaybackState(false);
+      setIsPlaying(false);
+      stopTimeSyncInterval();
+    });
+    safeSetAction("previoustrack", () => {
       getAudioService().affirmPlaybackState(true);
       handlePrev();
     });
-    navigator.mediaSession.setActionHandler("nexttrack", () => {
+    safeSetAction("nexttrack", () => {
       getAudioService().affirmPlaybackState(true);
       handleNext();
     });
-    navigator.mediaSession.setActionHandler("seekbackward", () => {
+    safeSetAction("seekto", (details: any) => {
+      if (typeof details.seekTime === "number" && !isNaN(details.seekTime)) {
+        if (useNativeAudioRef.current && nativeAudioRef.current) {
+          nativeAudioRef.current.currentTime = details.seekTime;
+          setCurrentTime(details.seekTime);
+        } else {
+          const player = ytPlayerRef.current;
+          if (player && typeof player.seekTo === "function") {
+            player.seekTo(details.seekTime, true);
+            setCurrentTime(details.seekTime);
+          }
+        }
+        updateMediaPosition();
+      }
+    });
+    safeSetAction("seekbackward", () => {
       if (useNativeAudioRef.current && nativeAudioRef.current) {
         const newTime = Math.max(0, nativeAudioRef.current.currentTime - 10);
         nativeAudioRef.current.currentTime = newTime;
@@ -336,7 +365,7 @@ export default function Player() {
         }
       }
     });
-    navigator.mediaSession.setActionHandler("seekforward", () => {
+    safeSetAction("seekforward", () => {
       if (useNativeAudioRef.current && nativeAudioRef.current) {
         const newTime = Math.min(nativeAudioRef.current.duration || 0, nativeAudioRef.current.currentTime + 10);
         nativeAudioRef.current.currentTime = newTime;
@@ -872,27 +901,56 @@ export default function Player() {
       ],
     });
 
-    navigator.mediaSession.setActionHandler("play", () => {
+    const safeSetAction = (action: string, handler: any) => {
+      try {
+        navigator.mediaSession.setActionHandler(action as any, handler);
+      } catch (e) {}
+    };
+
+    safeSetAction("play", () => {
       if ("mediaSession" in navigator) {
         navigator.mediaSession.playbackState = "playing";
       }
       handlePlayPause();
     });
-    navigator.mediaSession.setActionHandler("pause", () => {
+    safeSetAction("pause", () => {
       if ("mediaSession" in navigator) {
         navigator.mediaSession.playbackState = "paused";
       }
       handlePlayPause();
     });
-    navigator.mediaSession.setActionHandler("previoustrack", () => {
+    safeSetAction("stop", () => {
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        nativeAudioRef.current.pause();
+      }
+      getAudioService().setPlaybackState(false);
+      setIsPlaying(false);
+      stopTimeSyncInterval();
+    });
+    safeSetAction("previoustrack", () => {
       getAudioService().affirmPlaybackState(true);
       handlePrev();
     });
-    navigator.mediaSession.setActionHandler("nexttrack", () => {
+    safeSetAction("nexttrack", () => {
       getAudioService().affirmPlaybackState(true);
       handleNext();
     });
-    navigator.mediaSession.setActionHandler("seekbackward", () => {
+    safeSetAction("seekto", (details: any) => {
+      if (typeof details.seekTime === "number" && !isNaN(details.seekTime)) {
+        if (useNativeAudioRef.current && nativeAudioRef.current) {
+          nativeAudioRef.current.currentTime = details.seekTime;
+          setCurrentTime(details.seekTime);
+        } else {
+          const player = ytPlayerRef.current;
+          if (player && typeof player.seekTo === "function") {
+            player.seekTo(details.seekTime, true);
+            setCurrentTime(details.seekTime);
+          }
+        }
+        updateMediaPosition();
+      }
+    });
+    safeSetAction("seekbackward", () => {
       if (useNativeAudioRef.current && nativeAudioRef.current) {
         const newTime = Math.max(0, nativeAudioRef.current.currentTime - 10);
         nativeAudioRef.current.currentTime = newTime;
@@ -906,7 +964,7 @@ export default function Player() {
         }
       }
     });
-    navigator.mediaSession.setActionHandler("seekforward", () => {
+    safeSetAction("seekforward", () => {
       if (useNativeAudioRef.current && nativeAudioRef.current) {
         const newTime = Math.min(nativeAudioRef.current.duration || 0, nativeAudioRef.current.currentTime + 10);
         nativeAudioRef.current.currentTime = newTime;
