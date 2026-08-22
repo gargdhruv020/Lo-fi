@@ -315,6 +315,7 @@ export default function Player() {
       handlePlayPause();
     });
     safeSetAction("pause", () => {
+      (window as any).__isPlayingRequested = false;
       getAudioService().setPlaybackState(false);
       if (nativeAudioRef.current) {
         nativeAudioRef.current.pause();
@@ -906,6 +907,7 @@ export default function Player() {
       handlePlayPause();
     });
     safeSetAction("pause", () => {
+      (window as any).__isPlayingRequested = false;
       getAudioService().setPlaybackState(false);
       if (nativeAudioRef.current) {
         nativeAudioRef.current.pause();

@@ -141,6 +141,9 @@ class AudioService {
 
   public setPlaybackState(playing: boolean): void {
     this.affirmPlaybackState(playing);
+    if (typeof window !== "undefined") {
+      (window as any).__isPlayingRequested = playing;
+    }
 
     if (playing) {
       this.requestWakeLock();
