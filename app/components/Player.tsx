@@ -307,7 +307,7 @@ export default function Player() {
       } catch (e) {}
     };
 
-    // Re-bind action handlers to ensure they point to our controller (iOS WebKit requires seekto to show Next/Prev)
+    // Re-bind action handlers for Bluetooth earbuds & system media controls
     safeSetAction("play", () => {
       if ("mediaSession" in navigator) {
         navigator.mediaSession.playbackState = "playing";
@@ -334,11 +334,22 @@ export default function Player() {
       setIsPlaying(false);
       stopTimeSyncInterval();
     });
+    safeSetAction("togglepause", () => {
+      handlePlayPause();
+    });
     safeSetAction("previoustrack", () => {
       getAudioService().affirmPlaybackState(true);
       handlePrev();
     });
     safeSetAction("nexttrack", () => {
+      getAudioService().affirmPlaybackState(true);
+      handleNext();
+    });
+    safeSetAction("seekbackward", () => {
+      getAudioService().affirmPlaybackState(true);
+      handlePrev();
+    });
+    safeSetAction("seekforward", () => {
       getAudioService().affirmPlaybackState(true);
       handleNext();
     });
@@ -355,34 +366,6 @@ export default function Player() {
           }
         }
         updateMediaPosition();
-      }
-    });
-    safeSetAction("seekbackward", () => {
-      if (useNativeAudioRef.current && nativeAudioRef.current) {
-        const newTime = Math.max(0, nativeAudioRef.current.currentTime - 10);
-        nativeAudioRef.current.currentTime = newTime;
-        setCurrentTime(newTime);
-      } else {
-        const player = ytPlayerRef.current;
-        if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
-          const newTime = Math.max(0, player.getCurrentTime() - 10);
-          player.seekTo(newTime, true);
-          setCurrentTime(newTime);
-        }
-      }
-    });
-    safeSetAction("seekforward", () => {
-      if (useNativeAudioRef.current && nativeAudioRef.current) {
-        const newTime = Math.min(nativeAudioRef.current.duration || 0, nativeAudioRef.current.currentTime + 10);
-        nativeAudioRef.current.currentTime = newTime;
-        setCurrentTime(newTime);
-      } else {
-        const player = ytPlayerRef.current;
-        if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
-          const newTime = Math.min(player.getDuration() || 0, player.getCurrentTime() + 10);
-          player.seekTo(newTime, true);
-          setCurrentTime(newTime);
-        }
       }
     });
   };
@@ -939,11 +922,22 @@ export default function Player() {
       setIsPlaying(false);
       stopTimeSyncInterval();
     });
+    safeSetAction("togglepause", () => {
+      handlePlayPause();
+    });
     safeSetAction("previoustrack", () => {
       getAudioService().affirmPlaybackState(true);
       handlePrev();
     });
     safeSetAction("nexttrack", () => {
+      getAudioService().affirmPlaybackState(true);
+      handleNext();
+    });
+    safeSetAction("seekbackward", () => {
+      getAudioService().affirmPlaybackState(true);
+      handlePrev();
+    });
+    safeSetAction("seekforward", () => {
       getAudioService().affirmPlaybackState(true);
       handleNext();
     });
@@ -960,34 +954,6 @@ export default function Player() {
           }
         }
         updateMediaPosition();
-      }
-    });
-    safeSetAction("seekbackward", () => {
-      if (useNativeAudioRef.current && nativeAudioRef.current) {
-        const newTime = Math.max(0, nativeAudioRef.current.currentTime - 10);
-        nativeAudioRef.current.currentTime = newTime;
-        setCurrentTime(newTime);
-      } else {
-        const player = ytPlayerRef.current;
-        if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
-          const newTime = Math.max(0, player.getCurrentTime() - 10);
-          player.seekTo(newTime, true);
-          setCurrentTime(newTime);
-        }
-      }
-    });
-    safeSetAction("seekforward", () => {
-      if (useNativeAudioRef.current && nativeAudioRef.current) {
-        const newTime = Math.min(nativeAudioRef.current.duration || 0, nativeAudioRef.current.currentTime + 10);
-        nativeAudioRef.current.currentTime = newTime;
-        setCurrentTime(newTime);
-      } else {
-        const player = ytPlayerRef.current;
-        if (player && typeof player.getCurrentTime === "function" && typeof player.seekTo === "function") {
-          const newTime = Math.min(player.getDuration() || 0, player.getCurrentTime() + 10);
-          player.seekTo(newTime, true);
-          setCurrentTime(newTime);
-        }
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
