@@ -51,7 +51,7 @@ class AudioService {
         const p = this.audioElement.play();
         if (p) {
           p.then(() => {
-            if (!this.isPlaying) {
+            if (!this.isPlaying && this.audioElement?.src.startsWith("data:")) {
               this.audioElement?.pause();
             }
           }).catch(() => {});

@@ -222,6 +222,11 @@ export default function Player() {
 
     // Attach native audio singleton reference immediately on mount
     nativeAudioRef.current = getAudioService().audioElement;
+    if (nativeAudioRef.current) {
+      nativeAudioRef.current.onended = () => {
+        handleNext();
+      };
+    }
 
     // Intercept MediaSession calls to prevent YouTube iframe from hijacking controls
     if ("mediaSession" in navigator) {
