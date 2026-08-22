@@ -130,6 +130,7 @@ export default function Player() {
   const useNativeAudioRef = useRef(false);
   const shouldPlayOnReadyRef = useRef(false);
   const queuedVideoIdRef = useRef<string | null>(null);
+  const isPlayingRef = useRef(false);
 
   const wakeLockRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -292,7 +293,7 @@ export default function Player() {
     if (!targetTrack) return;
 
     (window as any).__customTrackTitle = targetTrack.title;
-    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+    navigator.mediaSession.playbackState = isPlayingRef.current ? "playing" : "paused";
 
     // Force our metadata to override the YouTube iframe's metadata
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -303,87 +304,15 @@ export default function Player() {
         { src: targetTrack.cover, sizes: "512x512", type: "image/jpeg" },
       ],
     });
-
-    const safeSetAction = (action: string, handler: any) => {
-      try {
-        navigator.mediaSession.setActionHandler(action as any, handler);
-      } catch (e) {}
-    };
-
-    // Re-bind action handlers: single tap strictly toggles Play/Pause, double tap switches Next/Prev
-    safeSetAction("play", () => {
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.playbackState = "playing";
-      }
-      handlePlayPause();
-    });
-    safeSetAction("pause", () => {
-      (window as any).__isPlayingRequested = false;
-      getAudioService().setPlaybackState(false);
-      if (nativeAudioRef.current) {
-        nativeAudioRef.current.pause();
-      }
-      const audioSingleton = getAudioService().audioElement;
-      if (audioSingleton) {
-        audioSingleton.pause();
-      }
-      setIsPlaying(false);
-      stopTimeSyncInterval();
-    });
-    safeSetAction("stop", () => {
-      if (useNativeAudioRef.current && nativeAudioRef.current) {
-        nativeAudioRef.current.pause();
-      }
-      getAudioService().setPlaybackState(false);
-      setIsPlaying(false);
-      stopTimeSyncInterval();
-    });
-    safeSetAction("togglepause", () => {
-      handlePlayPause();
-    });
-    // Left Earbud -> Previous Song
-    safeSetAction("previoustrack", () => {
-      getAudioService().affirmPlaybackState(true);
-      handlePrev();
-    });
-    safeSetAction("seekbackward", () => {
-      getAudioService().affirmPlaybackState(true);
-      handlePrev();
-    });
-
-    // Right Earbud -> Next Song
-    safeSetAction("nexttrack", () => {
-      getAudioService().affirmPlaybackState(true);
-      handleNext();
-    });
-    safeSetAction("seekforward", () => {
-      getAudioService().affirmPlaybackState(true);
-      handleNext();
-    });
-    safeSetAction("seekto", (details: any) => {
-      if (typeof details.seekTime === "number" && !isNaN(details.seekTime)) {
-        if (useNativeAudioRef.current && nativeAudioRef.current) {
-          nativeAudioRef.current.currentTime = details.seekTime;
-          setCurrentTime(details.seekTime);
-        } else {
-          const player = ytPlayerRef.current;
-          if (player && typeof player.seekTo === "function") {
-            player.seekTo(details.seekTime, true);
-            setCurrentTime(details.seekTime);
-          }
-        }
-        updateMediaPosition();
-      }
-    });
   };
 
   const startTimeSyncInterval = () => {
     if (timeIntervalRef.current) clearInterval(timeIntervalRef.current);
     timeIntervalRef.current = setInterval(() => {
       if (useNativeAudioRef.current && nativeAudioRef.current) {
-        // Native audio is the active engine
-        const audio = nativeAudioRef.current;
-        if (!audio.paused && !isSeeking) {
+        // Native audio is the active engine — use the audioService singleton
+        const audio = getAudioService().audioElement || nativeAudioRef.current;
+        if (audio && !audio.paused && !isSeeking) {
           setCurrentTime(audio.currentTime || 0);
           setDuration(audio.duration || 0);
           updateMediaPosition();
@@ -442,6 +371,10 @@ export default function Player() {
   useEffect(() => {
     isShuffledRef.current = isShuffled;
   }, [isShuffled]);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   // Save Player State to LocalStorage safely using synchronized refs (prevents background stale closure reverts)
   const savePlayerState = (overrideTime?: number) => {
@@ -869,8 +802,9 @@ export default function Player() {
         if ((window as any).__isPlayingRequested || isPlaying) {
           requestWakeLock();
           startSilentAudioNode();
-          if (useNativeAudioRef.current && nativeAudioRef.current && nativeAudioRef.current.paused) {
-            nativeAudioRef.current.play().catch(() => {});
+          const audioSingleton = getAudioService().audioElement;
+          if (useNativeAudioRef.current && audioSingleton && audioSingleton.paused) {
+            audioSingleton.play().catch(() => {});
           }
         }
 
@@ -909,53 +843,48 @@ export default function Player() {
       } catch (e) {}
     };
 
+    // Single tap: Play
     safeSetAction("play", () => {
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.playbackState = "playing";
-      }
       handlePlayPause();
     });
+    // Single tap: Pause — directly pause ALL audio sources
     safeSetAction("pause", () => {
+      const audioSingleton = getAudioService().audioElement;
+      if (audioSingleton) audioSingleton.pause();
+      if (nativeAudioRef.current && nativeAudioRef.current !== audioSingleton) nativeAudioRef.current.pause();
+      if (ytPlayerRef.current && typeof ytPlayerRef.current.pauseVideo === "function") {
+        try { ytPlayerRef.current.pauseVideo(); } catch {}
+      }
       (window as any).__isPlayingRequested = false;
       getAudioService().setPlaybackState(false);
-      if (nativeAudioRef.current) {
-        nativeAudioRef.current.pause();
-      }
-      const audioSingleton = getAudioService().audioElement;
-      if (audioSingleton) {
-        audioSingleton.pause();
-      }
       setIsPlaying(false);
       stopTimeSyncInterval();
     });
     safeSetAction("stop", () => {
-      if (useNativeAudioRef.current && nativeAudioRef.current) {
-        nativeAudioRef.current.pause();
-      }
+      const audioSingleton = getAudioService().audioElement;
+      if (audioSingleton) audioSingleton.pause();
+      if (nativeAudioRef.current && nativeAudioRef.current !== audioSingleton) nativeAudioRef.current.pause();
+      (window as any).__isPlayingRequested = false;
       getAudioService().setPlaybackState(false);
       setIsPlaying(false);
       stopTimeSyncInterval();
     });
+    // Single tap toggle
     safeSetAction("togglepause", () => {
       handlePlayPause();
     });
     // Left Earbud -> Previous Song
     safeSetAction("previoustrack", () => {
-      getAudioService().affirmPlaybackState(true);
       handlePrev();
     });
     safeSetAction("seekbackward", () => {
-      getAudioService().affirmPlaybackState(true);
       handlePrev();
     });
-
     // Right Earbud -> Next Song
     safeSetAction("nexttrack", () => {
-      getAudioService().affirmPlaybackState(true);
       handleNext();
     });
     safeSetAction("seekforward", () => {
-      getAudioService().affirmPlaybackState(true);
       handleNext();
     });
     safeSetAction("seekto", (details: any) => {
@@ -974,7 +903,7 @@ export default function Player() {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrackId, currentTrack, tracks]);
+  }, [currentTrackId, currentTrack, tracks, isPlaying]);
 
   const handleAudioError = () => {
     console.warn("Audio playback encountered an error.");
@@ -986,15 +915,18 @@ export default function Player() {
   const handlePlayPause = () => {
     getAudioService().primeUserGesture();
 
-    if (!isPlaying) {
-      const src = nativeAudioRef.current?.src || "";
+    // Use ref to get the CURRENT playing state (avoids stale closure from MediaSession handlers)
+    const currentlyPlaying = isPlayingRef.current;
+
+    if (!currentlyPlaying) {
+      // RESUME / PLAY
+      const audioSingleton = getAudioService().audioElement;
+      const src = audioSingleton?.src || nativeAudioRef.current?.src || "";
       const isRealTrackUrl = src.startsWith("http://") || src.startsWith("https://") || src.startsWith("blob:");
 
-      // If native audio already has a real song URL set and paused, resume playback directly
-      if (useNativeAudioRef.current && nativeAudioRef.current && isRealTrackUrl) {
-        const audio = nativeAudioRef.current;
+      if (useNativeAudioRef.current && audioSingleton && isRealTrackUrl) {
         getAudioService().setPlaybackState(true);
-        audio
+        audioSingleton
           .play()
           .then(() => {
             setIsPlaying(true);
@@ -1003,14 +935,27 @@ export default function Player() {
           .catch(() => {
             playTrack(currentTrack);
           });
+      } else if (ytPlayerRef.current && typeof ytPlayerRef.current.playVideo === "function" && !useNativeAudioRef.current) {
+        ytPlayerRef.current.playVideo();
+        getAudioService().setPlaybackState(true);
+        setIsPlaying(true);
+        startTimeSyncInterval();
       } else {
         playTrack(currentTrack);
       }
     } else {
-      // Pause playback
-      if (useNativeAudioRef.current && nativeAudioRef.current) {
+      // PAUSE — stop ALL possible audio sources
+      const audioSingleton = getAudioService().audioElement;
+      if (audioSingleton) {
+        audioSingleton.pause();
+      }
+      if (nativeAudioRef.current && nativeAudioRef.current !== audioSingleton) {
         nativeAudioRef.current.pause();
       }
+      if (ytPlayerRef.current && typeof ytPlayerRef.current.pauseVideo === "function") {
+        try { ytPlayerRef.current.pauseVideo(); } catch {}
+      }
+      (window as any).__isPlayingRequested = false;
       getAudioService().setPlaybackState(false);
       setIsPlaying(false);
       stopTimeSyncInterval();
