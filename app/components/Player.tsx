@@ -337,29 +337,24 @@ export default function Player() {
     safeSetAction("togglepause", () => {
       handlePlayPause();
     });
+    // Left Earbud -> Previous Song
     safeSetAction("previoustrack", () => {
       getAudioService().affirmPlaybackState(true);
       handlePrev();
     });
+    safeSetAction("seekbackward", () => {
+      getAudioService().affirmPlaybackState(true);
+      handlePrev();
+    });
+
+    // Right Earbud -> Next Song
     safeSetAction("nexttrack", () => {
       getAudioService().affirmPlaybackState(true);
       handleNext();
     });
-    safeSetAction("seekbackward", () => {
-      if (useNativeAudioRef.current && nativeAudioRef.current) {
-        const newTime = Math.max(0, nativeAudioRef.current.currentTime - 10);
-        nativeAudioRef.current.currentTime = newTime;
-        setCurrentTime(newTime);
-        updateMediaPosition();
-      }
-    });
     safeSetAction("seekforward", () => {
-      if (useNativeAudioRef.current && nativeAudioRef.current) {
-        const newTime = Math.min(nativeAudioRef.current.duration || 0, nativeAudioRef.current.currentTime + 10);
-        nativeAudioRef.current.currentTime = newTime;
-        setCurrentTime(newTime);
-        updateMediaPosition();
-      }
+      getAudioService().affirmPlaybackState(true);
+      handleNext();
     });
     safeSetAction("seekto", (details: any) => {
       if (typeof details.seekTime === "number" && !isNaN(details.seekTime)) {
@@ -933,29 +928,24 @@ export default function Player() {
     safeSetAction("togglepause", () => {
       handlePlayPause();
     });
+    // Left Earbud -> Previous Song
     safeSetAction("previoustrack", () => {
       getAudioService().affirmPlaybackState(true);
       handlePrev();
     });
+    safeSetAction("seekbackward", () => {
+      getAudioService().affirmPlaybackState(true);
+      handlePrev();
+    });
+
+    // Right Earbud -> Next Song
     safeSetAction("nexttrack", () => {
       getAudioService().affirmPlaybackState(true);
       handleNext();
     });
-    safeSetAction("seekbackward", () => {
-      if (useNativeAudioRef.current && nativeAudioRef.current) {
-        const newTime = Math.max(0, nativeAudioRef.current.currentTime - 10);
-        nativeAudioRef.current.currentTime = newTime;
-        setCurrentTime(newTime);
-        updateMediaPosition();
-      }
-    });
     safeSetAction("seekforward", () => {
-      if (useNativeAudioRef.current && nativeAudioRef.current) {
-        const newTime = Math.min(nativeAudioRef.current.duration || 0, nativeAudioRef.current.currentTime + 10);
-        nativeAudioRef.current.currentTime = newTime;
-        setCurrentTime(newTime);
-        updateMediaPosition();
-      }
+      getAudioService().affirmPlaybackState(true);
+      handleNext();
     });
     safeSetAction("seekto", (details: any) => {
       if (typeof details.seekTime === "number" && !isNaN(details.seekTime)) {
