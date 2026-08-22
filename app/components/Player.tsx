@@ -924,52 +924,40 @@ export default function Player() {
   }, [currentTrackId, currentTrack, tracks]);
 
   const handleAudioError = () => {
-    console.warn("Audio playback encountered an error, skipping to next track.");
-    handleNext();
+    console.warn("Audio playback encountered an error.");
+    setIsPlaying(false);
+    setIsLoadingTrack(false);
+    getAudioService().setPlaybackState(false);
   };
 
   const handlePlayPause = () => {
     getAudioService().primeUserGesture();
 
-    // If native audio is the active engine
-    if (useNativeAudioRef.current && nativeAudioRef.current) {
-      const audio = nativeAudioRef.current;
-      if (audio.paused) {
+    if (!isPlaying) {
+      // If native audio already has a source set and paused, resume playback directly
+      if (useNativeAudioRef.current && nativeAudioRef.current && nativeAudioRef.current.src) {
+        const audio = nativeAudioRef.current;
         getAudioService().setPlaybackState(true);
-        audio.play().catch(() => {});
-        setIsPlaying(true);
-        startTimeSyncInterval();
+        audio
+          .play()
+          .then(() => {
+            setIsPlaying(true);
+            startTimeSyncInterval();
+          })
+          .catch(() => {
+            playTrack(currentTrack);
+          });
       } else {
-        getAudioService().setPlaybackState(false);
-        audio.pause();
-        setIsPlaying(false);
-        stopTimeSyncInterval();
+        playTrack(currentTrack);
       }
-      return;
-    }
-
-    // YouTube iframe engine
-    if (!ytPlayerRef.current || typeof ytPlayerRef.current.playVideo !== "function") {
-      playTrack(currentTrack);
-      return;
-    }
-    try {
-      const state = ytPlayerRef.current.getPlayerState();
-      if (state === 1) {
-        ytPlayerRef.current.pauseVideo();
-        bgAudioRef.current?.pause();
-        setIsPlaying(false);
-        stopTimeSyncInterval();
-      } else {
-        ytPlayerRef.current.playVideo();
-        bgAudioRef.current?.play().catch(() => {});
-        setIsPlaying(true);
-        startTimeSyncInterval();
-        updateMediaSession();
+    } else {
+      // Pause playback
+      if (useNativeAudioRef.current && nativeAudioRef.current) {
+        nativeAudioRef.current.pause();
       }
-    } catch (err) {
-      console.warn("Direct play toggle failed, re-initializing track:", err);
-      playTrack(currentTrack);
+      getAudioService().setPlaybackState(false);
+      setIsPlaying(false);
+      stopTimeSyncInterval();
     }
   };
 
