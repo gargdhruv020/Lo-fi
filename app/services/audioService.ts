@@ -46,13 +46,15 @@ class AudioService {
   public primeUserGesture(): void {
     if (this.audioElement) {
       this.ensureAudioContext();
-      const p = this.audioElement.play();
-      if (p) {
-        p.then(() => {
-          if (!this.isPlaying) {
-            this.audioElement?.pause();
-          }
-        }).catch(() => {});
+      if (!this.audioElement.src || this.audioElement.src === "" || this.audioElement.src === window.location.href) {
+        const p = this.audioElement.play();
+        if (p) {
+          p.then(() => {
+            if (!this.isPlaying) {
+              this.audioElement?.pause();
+            }
+          }).catch(() => {});
+        }
       }
     }
   }

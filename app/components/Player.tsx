@@ -220,6 +220,9 @@ export default function Player() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    // Attach native audio singleton reference immediately on mount
+    nativeAudioRef.current = getAudioService().audioElement;
+
     // Intercept MediaSession calls to prevent YouTube iframe from hijacking controls
     if ("mediaSession" in navigator) {
       const originalSetActionHandler = navigator.mediaSession.setActionHandler;
