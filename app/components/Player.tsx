@@ -222,11 +222,6 @@ export default function Player() {
 
     // Attach native audio singleton reference immediately on mount
     nativeAudioRef.current = getAudioService().audioElement;
-    if (nativeAudioRef.current) {
-      nativeAudioRef.current.onended = () => {
-        handleNext();
-      };
-    }
 
     // Intercept MediaSession calls to prevent YouTube iframe from hijacking controls
     if ("mediaSession" in navigator) {
@@ -723,6 +718,12 @@ export default function Player() {
           .then(() => {
             if (activeTrackIdRef.current === track.id) {
               nativeAudioRef.current = getAudioService().audioElement;
+              // Attach auto-advance handler on the singleton after real track loads
+              if (nativeAudioRef.current) {
+                nativeAudioRef.current.onended = () => {
+                  handleNext();
+                };
+              }
               setIsPlaying(true);
               setIsLoadingTrack(false);
               startTimeSyncInterval();
