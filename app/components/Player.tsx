@@ -1128,15 +1128,34 @@ export default function Player() {
       {/* ========================================================================= */}
       {isCatalogOpen && (
         <div
-          className={`w-full flex flex-col p-4 md:p-5 rounded-[28px] overflow-hidden h-[440px] ${glassClass} animate-in fade-in slide-in-from-bottom-5 duration-300`}
+          className={`w-full flex flex-col p-4 md:p-5 rounded-[28px] overflow-hidden h-[calc(100dvh-280px)] sm:h-[440px] max-h-[440px] min-h-[220px] ${glassClass} animate-in fade-in slide-in-from-bottom-5 duration-300`}
         >
           {/* Header Panel */}
           <div className="flex flex-col gap-3">
-            {/* Title and Search */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-              <h3 className="text-sm font-semibold tracking-wider uppercase text-white/90">
-                Lo-Fi Mixtapes
-              </h3>
+            {/* Title, Search, and Unified Play All */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <h3 className="text-xs sm:text-sm font-semibold tracking-wider uppercase text-white/95">
+                  Lo-Fi Mixtapes
+                </h3>
+                {/* Unified Category Play All Button */}
+                <button
+                  onClick={() => {
+                    const activePlaylist = filteredTracks.length > 0 ? filteredTracks : catalog;
+                    if (activePlaylist.length > 0) {
+                      tracksRef.current = activePlaylist;
+                      playTrack(activePlaylist[0], 0);
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-full text-[9px] font-bold tracking-wider uppercase bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1 transition-all focus:outline-none active:scale-95 shadow-md shadow-rose-900/25"
+                  title="Play all tracks in current view"
+                >
+                  <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Play All
+                </button>
+              </div>
               {/* Search Bar */}
               <div className="relative">
                 <input
@@ -1144,7 +1163,7 @@ export default function Player() {
                   placeholder="Search artist or song..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full md:w-56 px-3 py-1.5 pl-8 text-xs bg-white/5 focus:bg-white/10 border border-white/10 rounded-full text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-rose-500/50 transition-all"
+                  className="w-full sm:w-52 px-3 py-1.5 pl-8 text-xs bg-white/5 focus:bg-white/10 border border-white/10 rounded-full text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-rose-500/50 transition-all"
                 />
                 <svg
                   className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/45"
@@ -1163,55 +1182,29 @@ export default function Player() {
             </div>
 
             {/* Season Tabs Filter */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-white/5">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-white/5 pr-6">
               {(["all", "favourites", 1, 2, 3, 4] as const).map((season) => (
-                <div key={season} className="flex items-center gap-0.5 flex-shrink-0">
-                  <button
-                    onClick={() => setActiveSeason(season)}
-                    className={`px-3 py-1 rounded-full text-[10.5px] font-medium tracking-wide uppercase transition-all whitespace-nowrap focus:outline-none ${
-                      activeSeason === season
-                        ? "bg-rose-500 text-white shadow-md shadow-rose-900/25"
-                        : "text-white/60 hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    {season === "all"
-                      ? "All Tracks"
-                      : season === "favourites"
-                      ? "❤️ Favourites"
-                      : season === 1
-                      ? "90s & 2000s"
-                      : season === 2
-                      ? "Retro & Golden"
-                      : season === 3
-                      ? "Modern & Indie"
-                      : "BASS"}
-                  </button>
-                  {/* Play All button for this category */}
-                  <button
-                    onClick={() => {
-                      // Filter tracks for this season from full catalog
-                      const seasonTracks = catalog.filter((t) =>
-                        season === "all"
-                          ? true
-                          : season === "favourites"
-                          ? !!t.isFavourite
-                          : t.season === season
-                      );
-                      if (seasonTracks.length > 0) {
-                        setActiveSeason(season);
-                        tracksRef.current = seasonTracks;
-                        playTrack(seasonTracks[0], 0);
-                      }
-                    }}
-                    className="w-5 h-5 rounded-full flex items-center justify-center bg-white/5 hover:bg-rose-500/80 text-white/50 hover:text-white transition-all focus:outline-none active:scale-90"
-                    aria-label={`Play ${season === "all" ? "all tracks" : season === "favourites" ? "favourites" : `season ${season}`}`}
-                    title="Play all"
-                  >
-                    <svg className="w-2.5 h-2.5 fill-current translate-x-[0.5px]" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </button>
-                </div>
+                <button
+                  key={season}
+                  onClick={() => setActiveSeason(season)}
+                  className={`px-3 py-1 rounded-full text-[10.5px] font-medium tracking-wide uppercase transition-all whitespace-nowrap focus:outline-none flex-shrink-0 ${
+                    activeSeason === season
+                      ? "bg-rose-500 text-white shadow-md shadow-rose-900/25"
+                      : "text-white/60 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  {season === "all"
+                    ? "All"
+                    : season === "favourites"
+                    ? "❤️ Liked"
+                    : season === 1
+                    ? "90s & 00s"
+                    : season === 2
+                    ? "Retro"
+                    : season === 3
+                    ? "Indie"
+                    : "Bass"}
+                </button>
               ))}
             </div>
           </div>
@@ -1483,23 +1476,25 @@ export default function Player() {
         className={`sm:hidden flex flex-col p-6 rounded-3xl w-full select-none ${glassClass}`}
       >
         {/* Vinyl Centerpiece */}
-        <div className="flex justify-center mb-6">
-          <div className="relative w-44 h-44 flex-shrink-0 shadow-2xl">
-            <div
-              className="w-full h-full rounded-full bg-black border border-white/10 overflow-hidden shadow-lg animate-vinyl-spin"
-              style={{
-                animationPlayState: (isPlaying && !isLoadingTrack) ? "running" : "paused",
-                backgroundImage: `url(${currentTrack.cover})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            />
-            {/* Vinyl Grooves Overlay */}
-            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.4)_50%,transparent_60%,rgba(0,0,0,0.4)_70%,transparent_80%)] pointer-events-none" />
-            {/* Spindle Hole */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-black/70 ring-4 ring-white/40 shadow-inner" />
+        {!isCatalogOpen && (
+          <div className="flex justify-center mb-6">
+            <div className="relative w-44 h-44 flex-shrink-0 shadow-2xl">
+              <div
+                className="w-full h-full rounded-full bg-black border border-white/10 overflow-hidden shadow-lg animate-vinyl-spin"
+                style={{
+                  animationPlayState: (isPlaying && !isLoadingTrack) ? "running" : "paused",
+                  backgroundImage: `url(${currentTrack.cover})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+              />
+              {/* Vinyl Grooves Overlay */}
+              <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.4)_50%,transparent_60%,rgba(0,0,0,0.4)_70%,transparent_80%)] pointer-events-none" />
+              {/* Spindle Hole */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-black/70 ring-4 ring-white/40 shadow-inner" />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Title and Artist */}
         <div className="text-center mb-4 min-w-0">
