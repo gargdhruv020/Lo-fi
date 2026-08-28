@@ -17,14 +17,43 @@ export default function PullToRefresh() {
     if (typeof window === "undefined") return;
 
     const handleTouchStart = (e: TouchEvent) => {
-      // Precise scroll detection: only track if user is at the top of the page
+      // 1. Precise scroll detection: only track if window is at the top
       const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
-      if (scrollTop <= 1 && e.touches.length === 1) {
-        startYRef.current = e.touches[0].clientY;
-        isCandidateRef.current = true;
-      } else {
+      if (scrollTop > 1 || e.touches.length !== 1) {
         isCandidateRef.current = false;
+        return;
       }
+
+      // 2. Viewport boundary guard: only allow pull-to-refresh if pulling from the upper part of the screen (top 150px)
+      const touchY = e.touches[0].clientY;
+      if (touchY > 150) {
+        isCandidateRef.current = false;
+        return;
+      }
+
+      // 3. Nested scrollable container guard: prevent refresh if starting pull inside a scrollable container (e.g. tracklist)
+      let target = e.target as HTMLElement | null;
+      let isInsideScrollable = false;
+      while (target && target !== document.body) {
+        const style = window.getComputedStyle(target);
+        if (
+          (style.overflowY === "auto" || style.overflowY === "scroll" || target.classList.contains("overflow-y-auto")) && 
+          target.scrollHeight > target.clientHeight
+        ) {
+          isInsideScrollable = true;
+          break;
+        }
+        target = target.parentElement;
+      }
+
+      if (isInsideScrollable) {
+        isCandidateRef.current = false;
+        return;
+      }
+
+      // If all guards pass, mark as candidate
+      startYRef.current = touchY;
+      isCandidateRef.current = true;
     };
 
     const handleTouchMove = (e: TouchEvent) => {
