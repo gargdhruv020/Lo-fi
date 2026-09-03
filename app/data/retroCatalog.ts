@@ -1,6 +1,6 @@
 import { CatalogTrack } from "./catalog";
 
-export type RetroEra = "1950-70s" | "1980-90s" | "2000-09s" | "all";
+export type RetroEra = "1950-70s" | "1980-90s" | "2000-09s" | "2010-19s" | "all";
 
 const retroCoverPool = [
   "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=400&auto=format&fit=crop",
@@ -30,7 +30,7 @@ const getHash = (str: string, max: number) => {
 interface RawRetroTrack {
   title: string;
   artist: string;
-  era: "1950-70s" | "1980-90s" | "2000-09s";
+  era: "1950-70s" | "1980-90s" | "2000-09s" | "2010-19s";
   isFavourite?: boolean;
 }
 
@@ -346,6 +346,110 @@ const raw2000sData: Omit<RawRetroTrack, "era">[] = [
   { title: "Labon Ko (Bhool Bhulaiyaa)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
 ];
 
+// ===== LIST 4: 2010–19s Instrumental Classics (100 Tracks) =====
+const raw2010sData: Omit<RawRetroTrack, "era">[] = [
+  { title: "Tum Hi Ho (Love Theme Instrumental) (Aashiqui 2)", artist: "Mithoon", isFavourite: true },
+  { title: "Sunn Raha Hai Na Tu (Flute Version) (Aashiqui 2)", artist: "Ankit Tiwari", isFavourite: true },
+  { title: "Aashiqui 2 Theme (Violin & Piano Score) (Aashiqui 2)", artist: "Mithoon", isFavourite: true },
+  { title: "Raabta (Kehte Hain Khuda Ne) (Acoustic Guitar Interlude) (Agent Vinod)", artist: "Pritam", isFavourite: true },
+  { title: "Mast Magan (Flute & Sitar Theme) (2 States)", artist: "Shankar–Ehsaan–Loy", isFavourite: true },
+  { title: "Samjhawan (Acoustic Guitar & Piano Theme) (Humpty Sharma Ki Dulhania)", artist: "Sharib–Toshi", isFavourite: true },
+  { title: "Agar Tum Saath Ho (Cello & Piano Instrumental Score) (Tamasha)", artist: "A. R. Rahman", isFavourite: true },
+  { title: "Matargashti (Accordion Solo Interlude) (Tamasha)", artist: "A. R. Rahman" },
+  { title: "Gerua (Violin & Flute Orchestral Theme) (Dilwale)", artist: "Pritam", isFavourite: true },
+  { title: "Janam Janam (Orchestral Theme Score) (Dilwale)", artist: "Pritam", isFavourite: true },
+  { title: "Zehnaseeb (Piano & Strings Instrumental) (Hasee Toh Phasee)", artist: "Vishal–Shekhar", isFavourite: true },
+  { title: "Man Mast Magan (Shenai & Acoustic Theme) (2 States)", artist: "Shankar–Ehsaan–Loy" },
+  { title: "Kaise Hua (Acoustic Guitar Solo Score) (Kabir Singh)", artist: "Vishal Mishra", isFavourite: true },
+  { title: "Tujhe Kitna Chahne Lage (Flute & Piano Theme) (Kabir Singh)", artist: "Mithoon", isFavourite: true },
+  { title: "Bekhayali (Electric Guitar Solo Theme) (Kabir Singh)", artist: "Sachet–Parampara", isFavourite: true },
+  { title: "Kabir's Sorrow (Sad Theme Score) (Kabir Singh)", artist: "Harshavardhan Rameshwar" },
+  { title: "Hawayein (Acoustic Fingerstyle Score) (Jab Harry Met Sejal)", artist: "Pritam", isFavourite: true },
+  { title: "Safar (Acoustic Theme) (Jab Harry Met Sejal)", artist: "Pritam" },
+  { title: "Ik Vaari Aa (Electronic Chill Instrumental) (Raabta)", artist: "Pritam" },
+  { title: "Enna Sona (Ambient Guitar & Synth Score) (OK Jaanu)", artist: "A. R. Rahman", isFavourite: true },
+  { title: "The OK Jaanu Theme (Instrumental Score) (OK Jaanu)", artist: "A. R. Rahman" },
+  { title: "Channa Mereya (Sad Acoustic & Flute Theme) (Ae Dil Hai Mushkil)", artist: "Pritam", isFavourite: true },
+  { title: "Ae Dil Hai Mushkil (Grand Piano Score) (Ae Dil Hai Mushkil)", artist: "Pritam", isFavourite: true },
+  { title: "Bulleya (Electric Guitar Interlude) (Ae Dil Hai Mushkil)", artist: "Pritam" },
+  { title: "Hasi (Acoustic Guitar Score) (Hamari Adhuri Kahani)", artist: "Ami Mishra", isFavourite: true },
+  { title: "Hamari Adhuri Kahani (Title Track Theme / Strings) (Hamari Adhuri Kahani)", artist: "Jeet Gannguli", isFavourite: true },
+  { title: "Kaun Tujhe (Piano & Flute Score) (M.S. Dhoni: The Untold Story)", artist: "Amaal Mallik", isFavourite: true },
+  { title: "Besabriyaan (Acoustic Guitar Theme) (M.S. Dhoni: The Untold Story)", artist: "Amaal Mallik" },
+  { title: "Namo Namo (Bansuri Interlude) (Kedarnath)", artist: "Amit Trivedi", isFavourite: true },
+  { title: "Jaan 'Nisaar (Violin & Piano Theme) (Kedarnath)", artist: "Amit Trivedi", isFavourite: true },
+  { title: "Qaafirana (Flute Theme Score) (Kedarnath)", artist: "Amit Trivedi", isFavourite: true },
+  { title: "Jag Ghoomeya (Acoustic Folk Score) (Sultan)", artist: "Vishal–Shekhar" },
+  { title: "Dil Diyan Gallan (Acoustic & Flute Theme) (Tiger Zinda Hai)", artist: "Vishal–Shekhar", isFavourite: true },
+  { title: "Tere Sang Yaara (Acoustic Guitar Theme) (Rustom)", artist: "Arko", isFavourite: true },
+  { title: "Dekha Hazaro Dafaa (Violin Theme) (Rustom)", artist: "Jeet Gannguli" },
+  { title: "Humsafar (Piano & Flute Score) (Badrinath Ki Dulhania)", artist: "Akhil Sachdeva", isFavourite: true },
+  { title: "Nazm Nazm (Acoustic Fingerstyle Theme) (Bareilly Ki Barfi)", artist: "Arko", isFavourite: true },
+  { title: "Bol Do Na Zara (Piano Interlude) (Azhar)", artist: "Amaal Mallik" },
+  { title: "Sanam Re (Piano & Violin Theme) (Sanam Re)", artist: "Mithoon", isFavourite: true },
+  { title: "Hua Hain Aaj Pehli Baar (Violin Score) (Sanam Re)", artist: "Amaal Mallik" },
+  { title: "Tum Hi Ho (Aashiqui 2)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Agar Tum Saath Ho (Tamasha)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Channa Mereya (Ae Dil Hai Mushkil)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Ae Dil Hai Mushkil (Ae Dil Hai Mushkil)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Raabta (Agent Vinod)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Samjhawan (Humpty Sharma Ki Dulhania)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Kaun Tujhe (M.S. Dhoni: The Untold Story)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Dil Diyan Gallan (Tiger Zinda Hai)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Hawayein (Jab Harry Met Sejal)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Tujhe Kitna Chahne Lage (Kabir Singh)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Kaise Hua (Kabir Singh)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Gerua (Dilwale)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Zehnaseeb (Hasee Toh Phasee)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Tere Sang Yaara (Rustom)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Nazm Nazm (Bareilly Ki Barfi)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Mast Magan (2 States)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Hasi (Hamari Adhuri Kahani)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Hamari Adhuri Kahani (Hamari Adhuri Kahani)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Enna Sona (OK Jaanu)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Sanam Re (Sanam Re)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Tum Hi Ho (Aashiqui 2)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Agar Tum Saath Ho (Tamasha)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Channa Mereya (Ae Dil Hai Mushkil)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Raabta (Agent Vinod)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Mast Magan (2 States)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Samjhawan (Humpty Sharma Ki Dulhania)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Kaun Tujhe (M.S. Dhoni: The Untold Story)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Dil Diyan Gallan (Tiger Zinda Hai)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Tujhe Kitna Chahne Lage (Kabir Singh)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Qaafirana (Kedarnath)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Jaan 'Nisaar (Kedarnath)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Hawayein (Jab Harry Met Sejal)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Gerua (Dilwale)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Nazm Nazm (Bareilly Ki Barfi)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Tere Sang Yaara (Rustom)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Humsafar (Badrinath Ki Dulhania)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Enna Sona (OK Jaanu)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Sanam Re (Sanam Re)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Bol Do Na Zara (Azhar)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Hasi (Hamari Adhuri Kahani)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Tum Hi Ho (Aashiqui 2)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Gerua (Dilwale)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Janam Janam (Dilwale)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Agar Tum Saath Ho (Tamasha)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Ae Dil Hai Mushkil (Ae Dil Hai Mushkil)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Channa Mereya (Ae Dil Hai Mushkil)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Samjhawan (Humpty Sharma Ki Dulhania)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Dil Diyan Gallan (Tiger Zinda Hai)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Kaun Tujhe (M.S. Dhoni: The Untold Story)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Hamari Adhuri Kahani (Hamari Adhuri Kahani)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Hawayein (Jab Harry Met Sejal)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Raabta (Agent Vinod)", artist: "Sadanand (Acoustic Guitar Solo)", isFavourite: true },
+  { title: "Kaise Hua (Kabir Singh)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Bekhayali (Kabir Singh)", artist: "Sadanand (Electric Guitar)", isFavourite: true },
+  { title: "Nazm Nazm (Bareilly Ki Barfi)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Enna Sona (OK Jaanu)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Tere Sang Yaara (Rustom)", artist: "Sadanand (Classical Guitar)", isFavourite: true },
+  { title: "Hasi (Hamari Adhuri Kahani)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Samjhawan (Humpty Sharma Ki Dulhania)", artist: "Sadanand (Acoustic Guitar Solo)", isFavourite: true },
+  { title: "Tum Hi Ho (Aashiqui 2)", artist: "Sadanand (Spanish Guitar)", isFavourite: true },
+];
+
 export const getRetroInstrumentalCatalog = (): CatalogTrack[] => {
   const list50: CatalogTrack[] = raw1950sData.map((item, index) => {
     const cleanTitle = item.title.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -404,5 +508,24 @@ export const getRetroInstrumentalCatalog = (): CatalogTrack[] => {
     };
   });
 
-  return [...list50, ...list80, ...list00];
+  const list10: CatalogTrack[] = raw2010sData.map((item, index) => {
+    const cleanTitle = item.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const cleanArtist = item.artist.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const id = `retro-10s-${index + 1}-${cleanArtist.slice(0, 10)}-${cleanTitle.slice(0, 15)}`;
+    const compositeKey = `${item.title}-${item.artist}`;
+    const coverIdx = getHash(compositeKey, retroCoverPool.length);
+
+    return {
+      id,
+      title: item.title,
+      artist: item.artist,
+      season: 2010,
+      url: "",
+      cover: retroCoverPool[coverIdx],
+      isFavourite: item.isFavourite,
+      era: "2010-19s",
+    };
+  });
+
+  return [...list50, ...list80, ...list00, ...list10];
 };
