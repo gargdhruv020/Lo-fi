@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { getHustleCatalog, CatalogTrack } from "../data/catalog";
+import { getHustleCatalog, getRetroInstrumentalCatalog, CatalogTrack } from "../data/catalog";
+import { RetroCategory } from "../data/retroCatalog";
 import { getAudioService } from "../services/audioService";
 
 export default function Player() {
-  // Load entire catalog
+  // Load entire catalogs
   const catalog = useMemo(() => getHustleCatalog(), []);
+  const retroCatalog = useMemo(() => getRetroInstrumentalCatalog(), []);
+  const allTracks = useMemo(() => [...catalog, ...retroCatalog], [catalog, retroCatalog]);
 
   // Client-side tracks state, initialized with standard catalog for SSR stability
   const [tracks, setTracks] = useState<CatalogTrack[]>(catalog);
@@ -113,7 +116,20 @@ export default function Player() {
 
   // Catalog panel states
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+  const [activeListType, setActiveListType] = useState<"main" | "retro">(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedRaw = localStorage.getItem("lofi_player_state");
+        if (savedRaw) {
+          const saved = JSON.parse(savedRaw);
+          if (saved && saved.trackId && saved.trackId.startsWith("retro-")) return "retro";
+        }
+      } catch (e) {}
+    }
+    return "main";
+  });
   const [activeSeason, setActiveSeason] = useState<number | "all" | "favourites">("all");
+  const [activeRetroCategory, setActiveRetroCategory] = useState<RetroCategory>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const playerRef = useRef<HTMLDivElement | null>(null);
@@ -284,10 +300,12 @@ export default function Player() {
   const updateMediaSession = (trackOverride?: CatalogTrack) => {
     if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
 
-    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+    const activeFallback = activeTrackIdRef.current.startsWith("retro-") ? retroCatalog : catalog;
+    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : activeFallback;
     const targetTrack =
       trackOverride ||
       activePlaylist.find((t) => t.id === activeTrackIdRef.current) ||
+      allTracks.find((t) => t.id === activeTrackIdRef.current) ||
       currentTrack;
 
     if (!targetTrack) return;
@@ -295,11 +313,16 @@ export default function Player() {
     (window as any).__customTrackTitle = targetTrack.title;
     navigator.mediaSession.playbackState = isPlayingRef.current ? "playing" : "paused";
 
+    const isRetro = targetTrack.season === 1950 || targetTrack.id.startsWith("retro-");
+    const albumTitle = isRetro
+      ? `1950-70s Instrumental Classics — ${targetTrack.category || "Retro"}`
+      : `Lo-Fi Radio — ${targetTrack.season === 1 ? "90s & 2000s" : targetTrack.season === 2 ? "Retro & Golden Era" : targetTrack.season === 3 ? "Modern & Indie" : "Bass Boosted"}`;
+
     // Force our metadata to override the YouTube iframe's metadata
     navigator.mediaSession.metadata = new MediaMetadata({
       title: targetTrack.title,
       artist: targetTrack.artist,
-      album: `Lo-Fi Radio — ${targetTrack.season === 1 ? "90s & 2000s" : targetTrack.season === 2 ? "Retro & Golden Era" : "Modern & Indie"}`,
+      album: albumTitle,
       artwork: [
         { src: targetTrack.cover, sizes: "512x512", type: "image/jpeg" },
       ],
@@ -439,12 +462,12 @@ export default function Player() {
     };
   }, [isCatalogOpen]);
 
-  // Current track object
+  // Current track object resolved across all catalogs (Lo-Fi + 1950-70s)
   const currentTrack = useMemo(() => {
-    return tracks.find((t) => t.id === currentTrackId) || catalog[0];
-  }, [tracks, catalog, currentTrackId]);
+    return allTracks.find((t) => t.id === currentTrackId) || catalog[0];
+  }, [allTracks, catalog, currentTrackId]);
 
-  // Filtered tracks list based on Season and Search query from full catalog
+  // Filtered tracks list based on Season and Search query from full Lo-Fi catalog
   const filteredTracks = useMemo(() => {
     return catalog.filter((track) => {
       const matchesSeason =
@@ -457,10 +480,31 @@ export default function Player() {
     });
   }, [catalog, activeSeason, searchQuery]);
 
-  // Keep tracksRef synced with filteredTracks for Next/Previous playback scoping
+  // Filtered tracks list based on Category and Search query from 1950-70s Instrumental catalog
+  const filteredRetroTracks = useMemo(() => {
+    return retroCatalog.filter((track) => {
+      const matchesCat =
+        activeRetroCategory === "all" ||
+        (activeRetroCategory === "favourites"
+          ? !!track.isFavourite
+          : track.category === activeRetroCategory);
+      const matchesSearch =
+        track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        track.artist.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCat && matchesSearch;
+    });
+  }, [retroCatalog, activeRetroCategory, searchQuery]);
+
+  // Currently active list tracks based on drawer selection (main vs retro)
+  const currentListTracks = useMemo(() => {
+    return activeListType === "retro" ? filteredRetroTracks : filteredTracks;
+  }, [activeListType, filteredRetroTracks, filteredTracks]);
+
+  // Keep tracksRef synced with active list for Next/Previous playback scoping
   useEffect(() => {
-    tracksRef.current = filteredTracks.length > 0 ? filteredTracks : catalog;
-  }, [filteredTracks, catalog]);
+    const activeFallback = activeListType === "retro" ? retroCatalog : catalog;
+    tracksRef.current = currentListTracks.length > 0 ? currentListTracks : activeFallback;
+  }, [currentListTracks, activeListType, retroCatalog, catalog]);
 
   // Centralized playTrack method to guarantee synchronous playback trigger within the click context
   // Centralized playTrack method to guarantee direct, clean playback of the requested track from start
@@ -614,7 +658,8 @@ export default function Player() {
   const playTrack = (track: CatalogTrack, explicitIndex?: number) => {
     if (!track) return;
 
-    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+    const activeFallback = track.id.startsWith("retro-") ? retroCatalog : catalog;
+    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : activeFallback;
     const idx = explicitIndex !== undefined ? explicitIndex : activePlaylist.findIndex((t) => t.id === track.id);
     const validIndex = idx !== -1 ? idx : 0;
 
@@ -828,10 +873,15 @@ export default function Player() {
     if (!("mediaSession" in navigator) || !currentTrack) return;
 
     (window as any).__customTrackTitle = currentTrack.title;
+    const isRetro = currentTrack.season === 1950 || currentTrack.id.startsWith("retro-");
+    const albumTitle = isRetro
+      ? `1950-70s Instrumental Classics — ${currentTrack.category || "Retro"}`
+      : `Lo-Fi Radio — ${currentTrack.season === 1 ? "90s & 2000s" : currentTrack.season === 2 ? "Retro & Golden Era" : currentTrack.season === 3 ? "Modern & Indie" : "Bass Boosted"}`;
+
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentTrack.title,
       artist: currentTrack.artist,
-      album: `Lo-Fi Radio — ${currentTrack.season === 1 ? "90s & 2000s" : currentTrack.season === 2 ? "Retro & Golden Era" : "Modern & Indie"}`,
+      album: albumTitle,
       artwork: [
         { src: currentTrack.cover, sizes: "512x512", type: "image/jpeg" },
       ],
@@ -997,7 +1047,8 @@ export default function Player() {
   };
 
   const handleNext = () => {
-    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+    const activeFallback = activeTrackIdRef.current.startsWith("retro-") ? retroCatalog : catalog;
+    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : activeFallback;
     if (activePlaylist.length === 0) return;
     const nextIndex = (currentIndexRef.current + 1) % activePlaylist.length;
     const nextTrack = activePlaylist[nextIndex];
@@ -1007,7 +1058,8 @@ export default function Player() {
   };
 
   const handlePrev = () => {
-    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : catalog;
+    const activeFallback = activeTrackIdRef.current.startsWith("retro-") ? retroCatalog : catalog;
+    const activePlaylist = tracksRef.current.length > 0 ? tracksRef.current : activeFallback;
     if (activePlaylist.length === 0) return;
     const prevIndex = (currentIndexRef.current - 1 + activePlaylist.length) % activePlaylist.length;
     const prevTrack = activePlaylist[prevIndex];
@@ -1067,10 +1119,26 @@ export default function Player() {
   };
 
   const selectTrack = (track: CatalogTrack) => {
-    const activePlaylist = filteredTracks.length > 0 ? filteredTracks : catalog;
+    const activeFallback = activeListType === "retro" ? retroCatalog : catalog;
+    const activePlaylist = currentListTracks.length > 0 ? currentListTracks : activeFallback;
     tracksRef.current = activePlaylist;
     const idx = activePlaylist.findIndex((t) => t.id === track.id);
     playTrack(track, idx !== -1 ? idx : undefined);
+  };
+
+  const handleToggleList = (type: "main" | "retro") => {
+    if (isCatalogOpen) {
+      if (activeListType === type) {
+        setIsCatalogOpen(false);
+      } else {
+        setActiveListType(type);
+        setSearchQuery("");
+      }
+    } else {
+      setActiveListType(type);
+      setSearchQuery("");
+      setIsCatalogOpen(true);
+    }
   };
 
   const formatTime = (time: number) => {
@@ -1134,14 +1202,57 @@ export default function Player() {
           <div className="flex flex-col gap-3">
             {/* Title, Search, and Unified Play All */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <h3 className="text-xs sm:text-sm font-semibold tracking-wider uppercase text-white/95">
-                  Lo-Fi Mixtapes
-                </h3>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {/* List Heading */}
+                <div className="flex items-center gap-1.5">
+                  {activeListType === "retro" ? (
+                    <svg className="w-4 h-4 text-rose-400 fill-current flex-shrink-0" viewBox="0 0 24 24">
+                      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4 text-rose-400 fill-none stroke-current flex-shrink-0" viewBox="0 0 24 24" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  )}
+                  <h3 className="text-xs sm:text-sm font-semibold tracking-wider uppercase text-white/95">
+                    {activeListType === "retro" ? "1950-70s" : "Lo-Fi Mixtapes"}
+                  </h3>
+                </div>
+
+                {/* List Switcher Pills */}
+                <div className="flex items-center bg-white/5 p-0.5 rounded-full border border-white/10 text-[10px]">
+                  <button
+                    onClick={() => {
+                      setActiveListType("main");
+                      setSearchQuery("");
+                    }}
+                    className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${
+                      activeListType === "main" ? "bg-rose-500 text-white shadow-sm" : "text-white/60 hover:text-white"
+                    }`}
+                  >
+                    Lo-Fi
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveListType("retro");
+                      setSearchQuery("");
+                    }}
+                    className={`px-2.5 py-0.5 rounded-full font-medium transition-all flex items-center gap-1 ${
+                      activeListType === "retro" ? "bg-rose-500 text-white shadow-sm" : "text-white/60 hover:text-white"
+                    }`}
+                  >
+                    <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
+                      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                    </svg>
+                    1950-70s
+                  </button>
+                </div>
+
                 {/* Unified Category Play All Button */}
                 <button
                   onClick={() => {
-                    const activePlaylist = filteredTracks.length > 0 ? filteredTracks : catalog;
+                    const activeFallback = activeListType === "retro" ? retroCatalog : catalog;
+                    const activePlaylist = currentListTracks.length > 0 ? currentListTracks : activeFallback;
                     if (activePlaylist.length > 0) {
                       tracksRef.current = activePlaylist;
                       playTrack(activePlaylist[0], 0);
@@ -1156,14 +1267,15 @@ export default function Player() {
                   Play All
                 </button>
               </div>
+
               {/* Search Bar */}
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Search artist or song..."
+                  placeholder={activeListType === "retro" ? "Search 1950-70s songs, instruments..." : "Search artist or song..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full sm:w-52 px-3 py-1.5 pl-8 text-xs bg-white/5 focus:bg-white/10 border border-white/10 rounded-full text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-rose-500/50 transition-all"
+                  className="w-full sm:w-56 px-3 py-1.5 pl-8 text-xs bg-white/5 focus:bg-white/10 border border-white/10 rounded-full text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-rose-500/50 transition-all"
                 />
                 <svg
                   className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/45"
@@ -1181,38 +1293,70 @@ export default function Player() {
               </div>
             </div>
 
-            {/* Season Tabs Filter */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-white/5 pr-6">
-              {(["all", "favourites", 1, 2, 3, 4] as const).map((season) => (
-                <button
-                  key={season}
-                  onClick={() => setActiveSeason(season)}
-                  className={`px-3 py-1 rounded-full text-[10.5px] font-medium tracking-wide uppercase transition-all whitespace-nowrap focus:outline-none flex-shrink-0 ${
-                    activeSeason === season
-                      ? "bg-rose-500 text-white shadow-md shadow-rose-900/25"
-                      : "text-white/60 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  {season === "all"
-                    ? "All"
-                    : season === "favourites"
-                    ? "❤️ Liked"
-                    : season === 1
-                    ? "90s & 00s"
-                    : season === 2
-                    ? "Retro"
-                    : season === 3
-                    ? "Indie"
-                    : "Bass"}
-                </button>
-              ))}
-            </div>
+            {/* Filter Tabs */}
+            {activeListType === "retro" ? (
+              /* 1950-70s Instrument Tabs */
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-white/5 pr-6">
+                {(["all", "favourites", "Guitar", "Piano", "Accordion", "Sax & Clarinet", "Flute & Themes"] as const).map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveRetroCategory(cat)}
+                    className={`px-3 py-1 rounded-full text-[10.5px] font-medium tracking-wide uppercase transition-all whitespace-nowrap focus:outline-none flex-shrink-0 ${
+                      activeRetroCategory === cat
+                        ? "bg-rose-500 text-white shadow-md shadow-rose-900/25"
+                        : "text-white/60 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    {cat === "all"
+                      ? `All (${retroCatalog.length})`
+                      : cat === "favourites"
+                      ? "❤️ Liked"
+                      : cat === "Guitar"
+                      ? "🎸 Guitar"
+                      : cat === "Piano"
+                      ? "🎹 Piano"
+                      : cat === "Accordion"
+                      ? "🪗 Accordion"
+                      : cat === "Sax & Clarinet"
+                      ? "🎷 Sax & Clarinet"
+                      : "🪈 Flute & Themes"}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              /* Lo-Fi Season Tabs */
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-white/5 pr-6">
+                {(["all", "favourites", 1, 2, 3, 4] as const).map((season) => (
+                  <button
+                    key={season}
+                    onClick={() => setActiveSeason(season)}
+                    className={`px-3 py-1 rounded-full text-[10.5px] font-medium tracking-wide uppercase transition-all whitespace-nowrap focus:outline-none flex-shrink-0 ${
+                      activeSeason === season
+                        ? "bg-rose-500 text-white shadow-md shadow-rose-900/25"
+                        : "text-white/60 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    {season === "all"
+                      ? "All"
+                      : season === "favourites"
+                      ? "❤️ Liked"
+                      : season === 1
+                      ? "90s & 00s"
+                      : season === 2
+                      ? "Retro"
+                      : season === 3
+                      ? "Indie"
+                      : "Bass"}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Scrollable Tracklist */}
           <div ref={catalogListRef} className="flex-1 overflow-y-auto mt-3 pr-1 space-y-1.5 scrollbar-thin">
-            {filteredTracks.length > 0 ? (
-              filteredTracks.map((track) => (
+            {currentListTracks.length > 0 ? (
+              currentListTracks.map((track) => (
                 <div
                   key={track.id}
                   data-track-id={track.id}
@@ -1251,7 +1395,7 @@ export default function Player() {
                     </div>
                   </div>
                   <span className="text-[9.5px] font-mono uppercase text-white/40 tracking-wider bg-white/5 px-2 py-0.5 rounded-full flex-shrink-0">
-                    {track.season === 1 ? "90s" : track.season === 2 ? "Retro" : track.season === 3 ? "Indie" : "Bass"}
+                    {track.category || (track.season === 1 ? "90s" : track.season === 2 ? "Retro" : track.season === 3 ? "Indie" : "Bass")}
                   </span>
                 </div>
               ))
@@ -1374,16 +1518,31 @@ export default function Player() {
                 </svg>
               </button>
 
-              {/* Toggle Catalog Panel Button */}
+              {/* Toggle Main List: Lo-Fi Mixtapes */}
               <button
-                onClick={() => setIsCatalogOpen((prev) => !prev)}
+                onClick={() => handleToggleList("main")}
                 className={`p-1.5 rounded-full transition-all focus:outline-none active:scale-95 ${
-                  isCatalogOpen ? "text-rose-400 bg-white/5" : "text-white/70 hover:text-white"
+                  isCatalogOpen && activeListType === "main" ? "text-rose-400 bg-white/10 ring-1 ring-rose-500/30" : "text-white/70 hover:text-white hover:bg-white/5"
                 }`}
-                aria-label="Toggle Catalog"
+                aria-label="Lo-Fi Mixtapes"
+                title="Lo-Fi Mixtapes"
               >
                 <svg className="w-[18px] h-[18px] fill-none stroke-current" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </button>
+
+              {/* Toggle 1950-70s List: Instrumental Classics (Music Icon) */}
+              <button
+                onClick={() => handleToggleList("retro")}
+                className={`p-1.5 rounded-full transition-all focus:outline-none active:scale-95 ${
+                  isCatalogOpen && activeListType === "retro" ? "text-rose-400 bg-white/10 ring-1 ring-rose-500/30" : "text-white/70 hover:text-white hover:bg-white/5"
+                }`}
+                aria-label="1950-70s Instrumentals"
+                title="1950-70s Instrumentals"
+              >
+                <svg className="w-[18px] h-[18px] fill-current" viewBox="0 0 24 24">
+                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
                 </svg>
               </button>
 
@@ -1558,16 +1717,31 @@ export default function Player() {
             </svg>
           </button>
 
-          {/* Toggle Catalog Panel Button */}
+          {/* Toggle Main List: Lo-Fi Mixtapes */}
           <button
-            onClick={() => setIsCatalogOpen((prev) => !prev)}
-            className={`p-3 rounded-full transition-all focus:outline-none active:scale-95 ${
-              isCatalogOpen ? "text-rose-400" : "text-white/70 hover:text-white"
+            onClick={() => handleToggleList("main")}
+            className={`p-2.5 rounded-full transition-all focus:outline-none active:scale-95 ${
+              isCatalogOpen && activeListType === "main" ? "text-rose-400 bg-white/10 ring-1 ring-rose-500/30" : "text-white/70 hover:text-white"
             }`}
-            aria-label="Toggle Catalog"
+            aria-label="Lo-Fi Mixtapes"
+            title="Lo-Fi Mixtapes"
           >
-            <svg className="w-[20px] h-[20px] fill-none stroke-current" viewBox="0 0 24 24" strokeWidth="2">
+            <svg className="w-[19px] h-[19px] fill-none stroke-current" viewBox="0 0 24 24" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </button>
+
+          {/* Toggle 1950-70s List: Instrumental Classics (Music Icon) */}
+          <button
+            onClick={() => handleToggleList("retro")}
+            className={`p-2.5 rounded-full transition-all focus:outline-none active:scale-95 ${
+              isCatalogOpen && activeListType === "retro" ? "text-rose-400 bg-white/10 ring-1 ring-rose-500/30" : "text-white/70 hover:text-white"
+            }`}
+            aria-label="1950-70s Instrumentals"
+            title="1950-70s Instrumentals"
+          >
+            <svg className="w-[19px] h-[19px] fill-current" viewBox="0 0 24 24">
+              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
             </svg>
           </button>
 

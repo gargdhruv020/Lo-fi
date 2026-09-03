@@ -6,7 +6,10 @@ export interface CatalogTrack {
   url: string;
   cover: string;
   isFavourite?: boolean;
+  category?: string;
 }
+
+export { getRetroInstrumentalCatalog } from "./retroCatalog";
 
 
 
