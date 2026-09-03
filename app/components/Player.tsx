@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { getHustleCatalog, getRetroInstrumentalCatalog, CatalogTrack } from "../data/catalog";
-import { RetroCategory } from "../data/retroCatalog";
 import { getAudioService } from "../services/audioService";
 
 export default function Player() {
@@ -129,7 +128,6 @@ export default function Player() {
     return "main";
   });
   const [activeSeason, setActiveSeason] = useState<number | "all" | "favourites">("all");
-  const [activeRetroCategory, setActiveRetroCategory] = useState<RetroCategory>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const playerRef = useRef<HTMLDivElement | null>(null);
@@ -315,7 +313,7 @@ export default function Player() {
 
     const isRetro = targetTrack.season === 1950 || targetTrack.id.startsWith("retro-");
     const albumTitle = isRetro
-      ? `1950-70s Instrumental Classics — ${targetTrack.category || "Retro"}`
+      ? "1950-70s Instrumental Classics"
       : `Lo-Fi Radio — ${targetTrack.season === 1 ? "90s & 2000s" : targetTrack.season === 2 ? "Retro & Golden Era" : targetTrack.season === 3 ? "Modern & Indie" : "Bass Boosted"}`;
 
     // Force our metadata to override the YouTube iframe's metadata
@@ -480,20 +478,17 @@ export default function Player() {
     });
   }, [catalog, activeSeason, searchQuery]);
 
-  // Filtered tracks list based on Category and Search query from 1950-70s Instrumental catalog
+  // Filtered tracks list for 1950-70s list (pure list as provided by user, filterable only by search)
   const filteredRetroTracks = useMemo(() => {
+    if (!searchQuery.trim()) return retroCatalog;
+    const query = searchQuery.toLowerCase().trim();
     return retroCatalog.filter((track) => {
-      const matchesCat =
-        activeRetroCategory === "all" ||
-        (activeRetroCategory === "favourites"
-          ? !!track.isFavourite
-          : track.category === activeRetroCategory);
-      const matchesSearch =
-        track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        track.artist.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCat && matchesSearch;
+      return (
+        track.title.toLowerCase().includes(query) ||
+        track.artist.toLowerCase().includes(query)
+      );
     });
-  }, [retroCatalog, activeRetroCategory, searchQuery]);
+  }, [retroCatalog, searchQuery]);
 
   // Currently active list tracks based on drawer selection (main vs retro)
   const currentListTracks = useMemo(() => {
@@ -875,7 +870,7 @@ export default function Player() {
     (window as any).__customTrackTitle = currentTrack.title;
     const isRetro = currentTrack.season === 1950 || currentTrack.id.startsWith("retro-");
     const albumTitle = isRetro
-      ? `1950-70s Instrumental Classics — ${currentTrack.category || "Retro"}`
+      ? "1950-70s Instrumental Classics"
       : `Lo-Fi Radio — ${currentTrack.season === 1 ? "90s & 2000s" : currentTrack.season === 2 ? "Retro & Golden Era" : currentTrack.season === 3 ? "Modern & Indie" : "Bass Boosted"}`;
 
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -1272,7 +1267,7 @@ export default function Player() {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder={activeListType === "retro" ? "Search 1950-70s songs, instruments..." : "Search artist or song..."}
+                  placeholder={activeListType === "retro" ? "Search 1950-70s songs..." : "Search artist or song..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full sm:w-56 px-3 py-1.5 pl-8 text-xs bg-white/5 focus:bg-white/10 border border-white/10 rounded-full text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-rose-500/50 transition-all"
@@ -1293,38 +1288,8 @@ export default function Player() {
               </div>
             </div>
 
-            {/* Filter Tabs */}
-            {activeListType === "retro" ? (
-              /* 1950-70s Instrument Tabs */
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-white/5 pr-6">
-                {(["all", "favourites", "Guitar", "Piano", "Accordion", "Sax & Clarinet", "Flute & Themes"] as const).map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveRetroCategory(cat)}
-                    className={`px-3 py-1 rounded-full text-[10.5px] font-medium tracking-wide uppercase transition-all whitespace-nowrap focus:outline-none flex-shrink-0 ${
-                      activeRetroCategory === cat
-                        ? "bg-rose-500 text-white shadow-md shadow-rose-900/25"
-                        : "text-white/60 hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    {cat === "all"
-                      ? `All (${retroCatalog.length})`
-                      : cat === "favourites"
-                      ? "❤️ Liked"
-                      : cat === "Guitar"
-                      ? "🎸 Guitar"
-                      : cat === "Piano"
-                      ? "🎹 Piano"
-                      : cat === "Accordion"
-                      ? "🪗 Accordion"
-                      : cat === "Sax & Clarinet"
-                      ? "🎷 Sax & Clarinet"
-                      : "🪈 Flute & Themes"}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              /* Lo-Fi Season Tabs */
+            {/* Filter Tabs — only for main Lo-Fi catalog */}
+            {activeListType === "main" && (
               <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-white/5 pr-6">
                 {(["all", "favourites", 1, 2, 3, 4] as const).map((season) => (
                   <button
@@ -1394,9 +1359,11 @@ export default function Player() {
                       </p>
                     </div>
                   </div>
-                  <span className="text-[9.5px] font-mono uppercase text-white/40 tracking-wider bg-white/5 px-2 py-0.5 rounded-full flex-shrink-0">
-                    {track.category || (track.season === 1 ? "90s" : track.season === 2 ? "Retro" : track.season === 3 ? "Indie" : "Bass")}
-                  </span>
+                  {activeListType === "main" && (
+                    <span className="text-[9.5px] font-mono uppercase text-white/40 tracking-wider bg-white/5 px-2 py-0.5 rounded-full flex-shrink-0">
+                      {track.season === 1 ? "90s" : track.season === 2 ? "Retro" : track.season === 3 ? "Indie" : "Bass"}
+                    </span>
+                  )}
                 </div>
               ))
             ) : (
