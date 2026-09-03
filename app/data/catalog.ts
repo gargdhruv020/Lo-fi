@@ -7,9 +7,10 @@ export interface CatalogTrack {
   cover: string;
   isFavourite?: boolean;
   category?: string;
+  era?: "1950-70s" | "1980-90s";
 }
 
-export { getRetroInstrumentalCatalog } from "./retroCatalog";
+export { getRetroInstrumentalCatalog, type RetroEra } from "./retroCatalog";
 
 
 

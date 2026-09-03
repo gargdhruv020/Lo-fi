@@ -1,5 +1,7 @@
 ﻿import { CatalogTrack } from "./catalog";
 
+export type RetroEra = "1950-70s" | "1980-90s" | "all";
+
 const retroCoverPool = [
   "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=400&auto=format&fit=crop",
   "https://images.unsplash.com/photo-1520523839898-50712825e617?q=80&w=400&auto=format&fit=crop",
@@ -28,10 +30,12 @@ const getHash = (str: string, max: number) => {
 interface RawRetroTrack {
   title: string;
   artist: string;
+  era: "1950-70s" | "1980-90s";
   isFavourite?: boolean;
 }
 
-const rawRetroData: RawRetroTrack[] = [
+// ===== LIST 1: 1950-70s Instrumental Classics =====
+const raw1950sData: Omit<RawRetroTrack, "era">[] = [
   { title: "Lag Ja Gale (Woh Kaun Thi?)", artist: "Sunil Ganguly (Hawaiian Guitar)", isFavourite: true },
   { title: "Pal Pal Dil Ke Paas (Blackmail)", artist: "Sunil Ganguly (Electric Guitar)", isFavourite: true },
   { title: "Chura Liya Hai Tumne Jo Dil Ko (Yaadon Ki Baaraat)", artist: "Sunil Ganguly (Hawaiian Guitar)", isFavourite: true },
@@ -134,11 +138,115 @@ const rawRetroData: RawRetroTrack[] = [
   { title: "The Great Gambler Instrumental Theme", artist: "The Great Gambler OST (R. D. Burman)" },
 ];
 
+// ===== LIST 2: 1980-90s Instrumental Classics =====
+const raw1980sData: Omit<RawRetroTrack, "era">[] = [
+  { title: "Flute & Violin Love Theme (Dilwale Dulhania Le Jayenge)", artist: "Jatin–Lalit", isFavourite: true },
+  { title: "Love Theme (Piano Solo) (Jo Jeeta Wohi Sikandar)", artist: "Jatin–Lalit", isFavourite: true },
+  { title: "Flute Theme / Soul of Fiiza (Khamoshi: The Musical)", artist: "Jatin–Lalit", isFavourite: true },
+  { title: "Theme of Taal (Taal)", artist: "A. R. Rahman", isFavourite: true },
+  { title: "Love Theme (Bombay)", artist: "A. R. Rahman", isFavourite: true },
+  { title: "The Spirit of Rangeela (Rangeela)", artist: "A. R. Rahman" },
+  { title: "Instrumental Love Theme (Roja)", artist: "A. R. Rahman", isFavourite: true },
+  { title: "The Dance of Envy (Dil To Pagal Hai)", artist: "Uttam Singh", isFavourite: true },
+  { title: "Love Theme (Violin & Synth) (Dil To Pagal Hai)", artist: "Uttam Singh" },
+  { title: "A Walk in the Woods (Kuch Kuch Hota Hai)", artist: "Jatin–Lalit", isFavourite: true },
+  { title: "Sad Piano & Flute Theme (Kuch Kuch Hota Hai)", artist: "Jatin–Lalit" },
+  { title: "Background Score Love Theme (Hum Dil De Chuke Sanam)", artist: "Ismail Darbar", isFavourite: true },
+  { title: "Violin Instrumental Interlude (Hum Dil De Chuke Sanam)", artist: "Ismail Darbar" },
+  { title: "Theme of 1942: A Love Story (Flute/Strings) (1942: A Love Story)", artist: "R. D. Burman", isFavourite: true },
+  { title: "Title Montage Instrumental (Akele Hum Akele Tum)", artist: "Anu Malik" },
+  { title: "Guitar Instrumental Interlude (Kabhi Haan Kabhi Naa)", artist: "Jatin–Lalit", isFavourite: true },
+  { title: "Love Melody Theme (Saajan)", artist: "Nadeem–Shravan", isFavourite: true },
+  { title: "Aashiqui Love Theme (Saxophone/Guitar) (Aashiqui)", artist: "Nadeem–Shravan", isFavourite: true },
+  { title: "Bansuri Theme (Satya)", artist: "Sandeep Chowta" },
+  { title: "Theme Music (Sadma)", artist: "Ilaiyaraaja", isFavourite: true },
+  { title: "Pehla Nasha (Jo Jeeta Wohi Sikandar)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Tujhe Dekha To Yeh Jaana Sanam (Dilwale Dulhania Le Jayenge)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Bahon Ke Darmiyan (Khamoshi: The Musical)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Ek Ladki Ko Dekha Toh (1942: A Love Story)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Kuch Na Kaho (1942: A Love Story)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Dheere Dheere Se Meri Zindagi (Aashiqui)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Mera Dil Bhi Kitna Pagal Hai (Saajan)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Bahut Pyar Karte Hain (Saajan)", artist: "Brian Silas (Piano)" },
+  { title: "Jab Koi Baat Bigad Jaye (Jurm)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Ae Mere Humsafar (Qayamat Se Qayamat Tak)", artist: "Brian Silas (Piano Solo)", isFavourite: true },
+  { title: "Gazab Ka Hai Din (Qayamat Se Qayamat Tak)", artist: "Brian Silas (Piano)" },
+  { title: "Tujhse Naraz Nahin Zindagi (Masoom)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Do Naina Aur Ek Kahani (Masoom)", artist: "Brian Silas (Piano)" },
+  { title: "Chand Chhupa Badal Mein (Hum Dil De Chuke Sanam)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Aankhon Ki Gustakhiyan (Hum Dil De Chuke Sanam)", artist: "Brian Silas (Piano)" },
+  { title: "Waada Raha Sanam (Khiladi)", artist: "Brian Silas (Piano)" },
+  { title: "Hoshwalon Ko Khabar Kya (Sarfarosh)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Rimjhim Rimjhim (1942: A Love Story)", artist: "Brian Silas (Piano Solo)" },
+  { title: "Dil Hai Ke Manta Nahin (Dil Hai Ke Manta Nahin)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Nazar Ke Samne (Aashiqui)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Pehla Nasha (Jo Jeeta Wohi Sikandar)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Kuch Na Kaho (1942: A Love Story)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Bahon Ke Darmiyan (Khamoshi: The Musical)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Tujhe Dekha To (Dilwale Dulhania Le Jayenge)", artist: "Ronu Majumdar (Flute Symphony)", isFavourite: true },
+  { title: "Ek Ladki Ko Dekha Toh (1942: A Love Story)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Mera Dil Bhi Kitna Pagal Hai (Saajan)", artist: "Rakesh Chaurasia (Bansuri)", isFavourite: true },
+  { title: "Tujhse Naraz Nahin (Masoom)", artist: "Pandit Ronu Majumdar (Flute)", isFavourite: true },
+  { title: "Jab Koi Baat (Jurm)", artist: "Ronu Majumdar (Bansuri)" },
+  { title: "Chand Chhupa Badal Mein (Hum Dil De Chuke Sanam)", artist: "Rakesh Chaurasia (Flute & Sitar)", isFavourite: true },
+  { title: "Ae Mere Humsafar (Qayamat Se Qayamat Tak)", artist: "Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Chori Chori Jab Nazrein Mili (Kareeb)", artist: "Rakesh Chaurasia (Flute)" },
+  { title: "Saathiya Tune Kya Kiya (Love)", artist: "Ronu Majumdar (Bansuri)" },
+  { title: "Tu Mile Dil Khile (Criminal)", artist: "Rakesh Chaurasia (Bansuri)", isFavourite: true },
+  { title: "Are Re Are (Dil To Pagal Hai)", artist: "Ronu Majumdar (Flute Solo)", isFavourite: true },
+  { title: "Dholna (Dil To Pagal Hai)", artist: "Rakesh Chaurasia (Flute)" },
+  { title: "Sun Sahiba Sun (Ram Teri Ganga Maili)", artist: "Ronu Majumdar (Bansuri)" },
+  { title: "Husn Pahadon Ka (Ram Teri Ganga Maili)", artist: "Rakesh Chaurasia (Bansuri)" },
+  { title: "Hoshwalon Ko Khabar Kya (Sarfarosh)", artist: "Ronu Majumdar (Flute)", isFavourite: true },
+  { title: "Jeeye To Jeeye Kaise (Saajan)", artist: "Rakesh Chaurasia (Bansuri)", isFavourite: true },
+  { title: "Akele Hain To Kya Gham Hai (Qayamat Se Qayamat Tak)", artist: "Ronu Majumdar (Flute)" },
+  { title: "Ek Ladki Ko Dekha Toh (1942: A Love Story)", artist: "Manohari Singh (Alto Sax)", isFavourite: true },
+  { title: "Kuch Na Kaho (1942: A Love Story)", artist: "Manohari Singh (Saxophone Solo)", isFavourite: true },
+  { title: "Rimjhim Gire Sawan (Manzil)", artist: "Manohari Singh (Saxophone)" },
+  { title: "Tip Tip Barsa Paani (Mohra)", artist: "Raj Sodha (Saxophone/Brass)", isFavourite: true },
+  { title: "Chura Ke Dil Mera (Main Khiladi Tu Anari)", artist: "Manohari Singh (Saxophone)", isFavourite: true },
+  { title: "Tujhe Dekha To (Dilwale Dulhania Le Jayenge)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Dheere Dheere Se (Aashiqui)", artist: "Manohari Singh (Saxophone)" },
+  { title: "Jab Koi Baat Bigad Jaye (Jurm)", artist: "Raj Sodha (Violin Ensemble)", isFavourite: true },
+  { title: "Mera Dil Bhi Kitna (Saajan)", artist: "Manohari Singh (Tenor Sax)" },
+  { title: "Ae Kash Ke Hum (Kabhi Haan Kabhi Naa)", artist: "Raj Sodha (Violin)" },
+  { title: "Pehla Nasha (Jo Jeeta Wohi Sikandar)", artist: "Raj Sodha & Manohari Singh (Violin & Sax Duet)", isFavourite: true },
+  { title: "Aisi Deewangi (Deewana)", artist: "Manohari Singh (Saxophone)" },
+  { title: "Hum Dil De Chuke Sanam (Hum Dil De Chuke Sanam)", artist: "Raj Sodha (Violin Solo)" },
+  { title: "Rooth Na Jaana (1942: A Love Story)", artist: "Manohari Singh (Saxophone)" },
+  { title: "Tu Cheez Badi Hai Mast Mast (Mohra)", artist: "Raj Sodha (Brass Ensemble)", isFavourite: true },
+  { title: "Baazigar O Baazigar (Baazigar)", artist: "Manohari Singh (Saxophone)", isFavourite: true },
+  { title: "Main Duniya Bhula Doonga (Aashiqui)", artist: "Raj Sodha (Violin)" },
+  { title: "Dekha Hai Pehli Baar (Saajan)", artist: "Manohari Singh (Saxophone)" },
+  { title: "Dil Ne Yeh Kaha Hai Dil Se (Dhadkan)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Tum Dil Ki Dhadkan Mein (Dhadkan)", artist: "Manohari Singh (Saxophone)", isFavourite: true },
+  { title: "Pehla Nasha (Jo Jeeta Wohi Sikandar)", artist: "Sunil Ganguly (Electric Hawaiian Guitar)", isFavourite: true },
+  { title: "Tujhe Dekha To (Dilwale Dulhania Le Jayenge)", artist: "Sunil Ganguly (Steel Guitar)", isFavourite: true },
+  { title: "Jab Koi Baat (Jurm)", artist: "Sunil Ganguly (Hawaiian Guitar)", isFavourite: true },
+  { title: "Ek Ladki Ko Dekha Toh (1942: A Love Story)", artist: "Sadanand (Acoustic Guitar)" },
+  { title: "Mera Dil Bhi Kitna (Saajan)", artist: "Sadanand (Spanish Guitar)" },
+  { title: "Bahut Pyar Karte Hain (Saajan)", artist: "Sunil Ganguly (Steel Guitar)" },
+  { title: "Ae Mere Humsafar (Qayamat Se Qayamat Tak)", artist: "Sunil Ganguly (Electric Guitar)", isFavourite: true },
+  { title: "Gazab Ka Hai Din (Qayamat Se Qayamat Tak)", artist: "Charanjit Singh (Synthesizer)", isFavourite: true },
+  { title: "Nazar Ke Samne (Aashiqui)", artist: "Sunil Ganguly (Guitar Solo)", isFavourite: true },
+  { title: "Dheere Dheere Se (Aashiqui)", artist: "Sadanand (Acoustic Guitar)" },
+  { title: "Kuch Na Kaho (1942: A Love Story)", artist: "Sadanand (Acoustic Guitar Solo)" },
+  { title: "Chura Ke Dil Mera (Main Khiladi Tu Anari)", artist: "Charanjit Singh (Synthesizer)", isFavourite: true },
+  { title: "Tip Tip Barsa Paani (Mohra)", artist: "Charanjit Singh (Synth Pop Instrumental)", isFavourite: true },
+  { title: "Saathiya Tune Kya Kiya (Love)", artist: "Sunil Ganguly (Hawaiian Guitar)" },
+  { title: "Dil Hai Ke Manta Nahin (Dil Hai Ke Manta Nahin)", artist: "Sunil Ganguly (Steel Guitar)", isFavourite: true },
+  { title: "Humne Ghar Chhoda Hai (Dil)", artist: "Sadanand (Acoustic Guitar)" },
+  { title: "Sun Sahiba Sun (Ram Teri Ganga Maili)", artist: "Sunil Ganguly (Hawaiian Guitar)" },
+  { title: "Zindagi Pyar Ka Geet Hai (Souten)", artist: "Sunil Ganguly (Hawaiian Guitar)" },
+  { title: "Tu Mile Dil Khile (Criminal)", artist: "Sadanand (Classical Guitar)", isFavourite: true },
+  { title: "Taal Se Taal Mila (Taal)", artist: "Charanjit Singh (Synthesizer & Sitar)", isFavourite: true },
+];
+
 export const getRetroInstrumentalCatalog = (): CatalogTrack[] => {
-  return rawRetroData.map((item, index) => {
+  const list50: CatalogTrack[] = raw1950sData.map((item, index) => {
     const cleanTitle = item.title.toLowerCase().replace(/[^a-z0-9]/g, "");
     const cleanArtist = item.artist.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const id = `retro-${index + 1}-${cleanArtist.slice(0, 10)}-${cleanTitle.slice(0, 15)}`;
+    const id = `retro-50s-${index + 1}-${cleanArtist.slice(0, 10)}-${cleanTitle.slice(0, 15)}`;
     const compositeKey = `${item.title}-${item.artist}`;
     const coverIdx = getHash(compositeKey, retroCoverPool.length);
 
@@ -150,6 +258,28 @@ export const getRetroInstrumentalCatalog = (): CatalogTrack[] => {
       url: "",
       cover: retroCoverPool[coverIdx],
       isFavourite: item.isFavourite,
+      era: "1950-70s",
     };
   });
+
+  const list80: CatalogTrack[] = raw1980sData.map((item, index) => {
+    const cleanTitle = item.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const cleanArtist = item.artist.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const id = `retro-80s-${index + 1}-${cleanArtist.slice(0, 10)}-${cleanTitle.slice(0, 15)}`;
+    const compositeKey = `${item.title}-${item.artist}`;
+    const coverIdx = getHash(compositeKey, retroCoverPool.length);
+
+    return {
+      id,
+      title: item.title,
+      artist: item.artist,
+      season: 1980,
+      url: "",
+      cover: retroCoverPool[coverIdx],
+      isFavourite: item.isFavourite,
+      era: "1980-90s",
+    };
+  });
+
+  return [...list50, ...list80];
 };

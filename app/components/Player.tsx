@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { getHustleCatalog, getRetroInstrumentalCatalog, CatalogTrack } from "../data/catalog";
+import { getHustleCatalog, getRetroInstrumentalCatalog, CatalogTrack, RetroEra } from "../data/catalog";
 import { getAudioService } from "../services/audioService";
 
 export default function Player() {
@@ -128,6 +128,18 @@ export default function Player() {
     return "main";
   });
   const [activeSeason, setActiveSeason] = useState<number | "all" | "favourites">("all");
+  const [activeRetroEra, setActiveRetroEra] = useState<RetroEra>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedRaw = localStorage.getItem("lofi_player_state");
+        if (savedRaw) {
+          const saved = JSON.parse(savedRaw);
+          if (saved && saved.trackId && saved.trackId.startsWith("retro-80s-")) return "1980-90s";
+        }
+      } catch (e) {}
+    }
+    return "1950-70s";
+  });
   const [searchQuery, setSearchQuery] = useState("");
 
   const playerRef = useRef<HTMLDivElement | null>(null);
@@ -311,9 +323,9 @@ export default function Player() {
     (window as any).__customTrackTitle = targetTrack.title;
     navigator.mediaSession.playbackState = isPlayingRef.current ? "playing" : "paused";
 
-    const isRetro = targetTrack.season === 1950 || targetTrack.id.startsWith("retro-");
+    const isRetro = targetTrack.season === 1950 || targetTrack.season === 1980 || targetTrack.id.startsWith("retro-");
     const albumTitle = isRetro
-      ? "1950-70s Instrumental Classics"
+      ? (targetTrack.era === "1980-90s" ? "1980-90s Instrumental Classics" : "1950-70s Instrumental Classics")
       : `Lo-Fi Radio — ${targetTrack.season === 1 ? "90s & 2000s" : targetTrack.season === 2 ? "Retro & Golden Era" : targetTrack.season === 3 ? "Modern & Indie" : "Bass Boosted"}`;
 
     // Force our metadata to override the YouTube iframe's metadata
@@ -478,17 +490,21 @@ export default function Player() {
     });
   }, [catalog, activeSeason, searchQuery]);
 
-  // Filtered tracks list for 1950-70s list (pure list as provided by user, filterable only by search)
+  // Filtered tracks list for Instrumental list (integrated 1950-70s & 1980-90s, filterable by search)
   const filteredRetroTracks = useMemo(() => {
-    if (!searchQuery.trim()) return retroCatalog;
+    let base = retroCatalog;
+    if (activeRetroEra !== "all") {
+      base = retroCatalog.filter((t) => t.era === activeRetroEra);
+    }
+    if (!searchQuery.trim()) return base;
     const query = searchQuery.toLowerCase().trim();
-    return retroCatalog.filter((track) => {
+    return base.filter((track) => {
       return (
         track.title.toLowerCase().includes(query) ||
         track.artist.toLowerCase().includes(query)
       );
     });
-  }, [retroCatalog, searchQuery]);
+  }, [retroCatalog, activeRetroEra, searchQuery]);
 
   // Currently active list tracks based on drawer selection (main vs retro)
   const currentListTracks = useMemo(() => {
@@ -868,9 +884,9 @@ export default function Player() {
     if (!("mediaSession" in navigator) || !currentTrack) return;
 
     (window as any).__customTrackTitle = currentTrack.title;
-    const isRetro = currentTrack.season === 1950 || currentTrack.id.startsWith("retro-");
+    const isRetro = currentTrack.season === 1950 || currentTrack.season === 1980 || currentTrack.id.startsWith("retro-");
     const albumTitle = isRetro
-      ? "1950-70s Instrumental Classics"
+      ? (currentTrack.era === "1980-90s" ? "1980-90s Instrumental Classics" : "1950-70s Instrumental Classics")
       : `Lo-Fi Radio — ${currentTrack.season === 1 ? "90s & 2000s" : currentTrack.season === 2 ? "Retro & Golden Era" : currentTrack.season === 3 ? "Modern & Indie" : "Bass Boosted"}`;
 
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -1114,6 +1130,9 @@ export default function Player() {
   };
 
   const selectTrack = (track: CatalogTrack) => {
+    if (track.era) {
+      setActiveRetroEra(track.era);
+    }
     const activeFallback = activeListType === "retro" ? retroCatalog : catalog;
     const activePlaylist = currentListTracks.length > 0 ? currentListTracks : activeFallback;
     tracksRef.current = activePlaylist;
@@ -1210,7 +1229,9 @@ export default function Player() {
                     </svg>
                   )}
                   <h3 className="text-xs sm:text-sm font-semibold tracking-wider uppercase text-white/95">
-                    {activeListType === "retro" ? "1950-70s" : "Lo-Fi Mixtapes"}
+                    {activeListType === "retro"
+                      ? (activeRetroEra === "all" ? "1950-90s Classics" : activeRetroEra)
+                      : "Lo-Fi Mixtapes"}
                   </h3>
                 </div>
 
@@ -1230,16 +1251,32 @@ export default function Player() {
                   <button
                     onClick={() => {
                       setActiveListType("retro");
+                      setActiveRetroEra("1950-70s");
                       setSearchQuery("");
                     }}
                     className={`px-2.5 py-0.5 rounded-full font-medium transition-all flex items-center gap-1 ${
-                      activeListType === "retro" ? "bg-rose-500 text-white shadow-sm" : "text-white/60 hover:text-white"
+                      activeListType === "retro" && activeRetroEra === "1950-70s" ? "bg-rose-500 text-white shadow-sm" : "text-white/60 hover:text-white"
                     }`}
                   >
                     <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
                       <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
                     </svg>
                     1950-70s
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveListType("retro");
+                      setActiveRetroEra("1980-90s");
+                      setSearchQuery("");
+                    }}
+                    className={`px-2.5 py-0.5 rounded-full font-medium transition-all flex items-center gap-1 ${
+                      activeListType === "retro" && activeRetroEra === "1980-90s" ? "bg-rose-500 text-white shadow-sm" : "text-white/60 hover:text-white"
+                    }`}
+                  >
+                    <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
+                      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                    </svg>
+                    1980-90s
                   </button>
                 </div>
 
@@ -1267,7 +1304,11 @@ export default function Player() {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder={activeListType === "retro" ? "Search 1950-70s songs..." : "Search artist or song..."}
+                  placeholder={
+                    activeListType === "retro"
+                      ? (activeRetroEra === "all" ? "Search 1950-90s songs..." : `Search ${activeRetroEra} songs...`)
+                      : "Search artist or song..."
+                  }
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full sm:w-56 px-3 py-1.5 pl-8 text-xs bg-white/5 focus:bg-white/10 border border-white/10 rounded-full text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-rose-500/50 transition-all"
@@ -1288,8 +1329,29 @@ export default function Player() {
               </div>
             </div>
 
-            {/* Filter Tabs — only for main Lo-Fi catalog */}
-            {activeListType === "main" && (
+            {/* Filter Tabs */}
+            {activeListType === "retro" ? (
+              /* Integrated Era Tabs */
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-white/5 pr-6">
+                {(["1950-70s", "1980-90s", "all"] as const).map((era) => (
+                  <button
+                    key={era}
+                    onClick={() => {
+                      setActiveRetroEra(era);
+                      setSearchQuery("");
+                    }}
+                    className={`px-3 py-1 rounded-full text-[10.5px] font-medium tracking-wide uppercase transition-all whitespace-nowrap focus:outline-none flex-shrink-0 ${
+                      activeRetroEra === era
+                        ? "bg-rose-500 text-white shadow-md shadow-rose-900/25"
+                        : "text-white/60 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    {era === "1950-70s" ? "1950-70s (100)" : era === "1980-90s" ? "1980-90s (100)" : "All (200)"}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              /* Lo-Fi Season Tabs */
               <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-white/5 pr-6">
                 {(["all", "favourites", 1, 2, 3, 4] as const).map((season) => (
                   <button
@@ -1499,14 +1561,14 @@ export default function Player() {
                 </svg>
               </button>
 
-              {/* Toggle 1950-70s List: Instrumental Classics (Music Icon) */}
+              {/* Toggle Instrumental List (Music Icon) */}
               <button
                 onClick={() => handleToggleList("retro")}
                 className={`p-1.5 rounded-full transition-all focus:outline-none active:scale-95 ${
                   isCatalogOpen && activeListType === "retro" ? "text-rose-400 bg-white/10 ring-1 ring-rose-500/30" : "text-white/70 hover:text-white hover:bg-white/5"
                 }`}
-                aria-label="1950-70s Instrumentals"
-                title="1950-70s Instrumentals"
+                aria-label="Instrumental Classics"
+                title="Instrumental Classics (1950-70s & 1980-90s)"
               >
                 <svg className="w-[18px] h-[18px] fill-current" viewBox="0 0 24 24">
                   <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
@@ -1698,14 +1760,14 @@ export default function Player() {
             </svg>
           </button>
 
-          {/* Toggle 1950-70s List: Instrumental Classics (Music Icon) */}
+          {/* Toggle Instrumental List (Music Icon) */}
           <button
             onClick={() => handleToggleList("retro")}
             className={`p-2.5 rounded-full transition-all focus:outline-none active:scale-95 ${
               isCatalogOpen && activeListType === "retro" ? "text-rose-400 bg-white/10 ring-1 ring-rose-500/30" : "text-white/70 hover:text-white"
             }`}
-            aria-label="1950-70s Instrumentals"
-            title="1950-70s Instrumentals"
+            aria-label="Instrumental Classics"
+            title="Instrumental Classics (1950-70s & 1980-90s)"
           >
             <svg className="w-[19px] h-[19px] fill-current" viewBox="0 0 24 24">
               <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
