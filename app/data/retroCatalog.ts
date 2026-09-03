@@ -1,6 +1,6 @@
 import { CatalogTrack } from "./catalog";
 
-export type RetroEra = "1950-70s" | "1980-90s" | "2000-09s" | "2010-19s" | "all";
+export type RetroEra = "1950-70s" | "1980-90s" | "2000-09s" | "2010-19s" | "2020s & Beyond" | "all";
 
 const retroCoverPool = [
   "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=400&auto=format&fit=crop",
@@ -30,7 +30,7 @@ const getHash = (str: string, max: number) => {
 interface RawRetroTrack {
   title: string;
   artist: string;
-  era: "1950-70s" | "1980-90s" | "2000-09s" | "2010-19s";
+  era: "1950-70s" | "1980-90s" | "2000-09s" | "2010-19s" | "2020s & Beyond";
   isFavourite?: boolean;
 }
 
@@ -450,6 +450,110 @@ const raw2010sData: Omit<RawRetroTrack, "era">[] = [
   { title: "Tum Hi Ho (Aashiqui 2)", artist: "Sadanand (Spanish Guitar)", isFavourite: true },
 ];
 
+// ===== LIST 5: 2020s & Beyond Instrumental Classics (100 Tracks) =====
+const raw2020sData: Omit<RawRetroTrack, "era">[] = [
+  { title: "Kesariya (Love Theme Score) (Brahmāstra)", artist: "Pritam", isFavourite: true },
+  { title: "Shiva & Isha Theme (Strings & Flute Score) (Brahmāstra)", artist: "Pritam", isFavourite: true },
+  { title: "Rasiya (Flute & Shehnai Theme) (Brahmāstra)", artist: "Pritam", isFavourite: true },
+  { title: "Ranjha (Acoustic Guitar & Sarangi Score) (Shershaah)", artist: "Jasleen Royal", isFavourite: true },
+  { title: "Raataan Lambiyan (Sad Flute Theme) (Shershaah)", artist: "Tanishk Bagchi", isFavourite: true },
+  { title: "Shershaah Theme (Violin & Piano Score) (Shershaah)", artist: "John Stewart Eduri", isFavourite: true },
+  { title: "Apna Bana Le (Flute & Piano Score) (Bhediya)", artist: "Sachin–Jigar", isFavourite: true },
+  { title: "Tere Hawaale (Sufi Flute & Harmonium Score) (Laal Singh Chaddha)", artist: "Pritam", isFavourite: true },
+  { title: "Kahani (Acoustic Guitar & Piano Theme) (Laal Singh Chaddha)", artist: "Pritam", isFavourite: true },
+  { title: "Feather Theme / Title Score (Laal Singh Chaddha)", artist: "Tanuj Tiku" },
+  { title: "Heeriye (Acoustic Fingerstyle Score)", artist: "Jasleen Royal", isFavourite: true },
+  { title: "Satranga (Sarangi & Flute Interlude) (ANIMAL)", artist: "Shreyas Puranik", isFavourite: true },
+  { title: "Pehle Bhi Main (Ambient Synth & Piano Theme) (ANIMAL)", artist: "Vishal Mishra", isFavourite: true },
+  { title: "Hua Main (Rock Ballad Electric Guitar Solo) (ANIMAL)", artist: "JAM8" },
+  { title: "Ranvijay's Love Theme (Cello & Strings) (ANIMAL)", artist: "Harshavardhan Rameshwar", isFavourite: true },
+  { title: "O Bedardeya (Sad Violin & Piano Score) (Tu Jhoothi Main Makkaar)", artist: "Pritam", isFavourite: true },
+  { title: "Tere Pyaar Mein (Acoustic Guitar Interlude) (Tu Jhoothi Main Makkaar)", artist: "Pritam" },
+  { title: "Ve Kamleya (Sufi Flute Theme) (Rocky Aur Rani Kii Prem Kahaani)", artist: "Pritam", isFavourite: true },
+  { title: "Tum Kya Mile (Grand Orchestral Strings Score) (Rocky Aur Rani Kii Prem Kahaani)", artist: "Pritam", isFavourite: true },
+  { title: "Sajni (Flute & Acoustic Score) (Laapataa Ladies)", artist: "Ram Sampath", isFavourite: true },
+  { title: "Phool's Journey (Solo Flute Theme) (Laapataa Ladies)", artist: "Ram Sampath" },
+  { title: "Dekhha Tenu (Piano & Shehnai Interlude) (Mr. & Mrs. Mahi)", artist: "Jaani", isFavourite: true },
+  { title: "Chaleya (Acoustic Guitar Score) (Jawan)", artist: "Anirudh Ravichander", isFavourite: true },
+  { title: "Aaradhya (Violin & Flute Score) (Kushi - Hindi)", artist: "Hesham Abdul Wahab" },
+  { title: "Tu Hai Kahaan (Lo-Fi Piano & Strings Score)", artist: "AUR", isFavourite: true },
+  { title: "Mann Jogiya (Sarangi & Flute Theme) (Pyaar Hai Toh Hai)", artist: "Ankit Tiwari" },
+  { title: "Naseeb Se (Violin & Mandolin Theme) (Satyaprem Ki Katha)", artist: "Payal Dev", isFavourite: true },
+  { title: "Aaj Ke Baad (Orchestral Strings Score) (Satyaprem Ki Katha)", artist: "Manan Bhardwaj" },
+  { title: "Dil Jhoom (Acoustic Guitar Theme) (Gadar 2)", artist: "Mithoon" },
+  { title: "Chal Tere Ishq Mein (Bansuri Theme) (Gadar 2)", artist: "Mithoon" },
+  { title: "Lutt Putt Gaya (Acoustic & Flute Score) (Dunki)", artist: "Pritam" },
+  { title: "O Maahi (Violin & Piano Theme) (Dunki)", artist: "Pritam", isFavourite: true },
+  { title: "Meri Zindagi Hai Tu (Piano Interlude) (Satyameva Jayate 2)", artist: "Rochak Kohli" },
+  { title: "Baarish Aayi Hai (Acoustic Solo Theme)", artist: "Javed–Mohsin" },
+  { title: "Dil Galti Kar Baitha Hai (Sufi Flute Theme)", artist: "Meet Bros" },
+  { title: "Rim Jhim (Acoustic Guitar Interlude) (14 Phere)", artist: "Raajeev V. Bhalla" },
+  { title: "Chitta (Piano & Strings Score) (Shiddat)", artist: "Manan Bhardwaj" },
+  { title: "Hum Dum (Acoustic Theme Score) (Shiddat)", artist: "Gourov Dasgupta" },
+  { title: "Jug Jugg Jeeyo (Flute Love Theme) (Jug Jugg Jeeyo)", artist: "Tanishk Bagchi" },
+  { title: "Nain Ta Heere (Acoustic Fingerstyle Score) (Jug Jugg Jeeyo)", artist: "Vishal Shelke" },
+  { title: "Kesariya (Brahmāstra)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Rasiya (Brahmāstra)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Raataan Lambiyan (Shershaah)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Ranjha (Shershaah)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Apna Bana Le (Bhediya)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Tere Hawaale (Laal Singh Chaddha)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Kahani (Laal Singh Chaddha)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Pehle Bhi Main (ANIMAL)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Satranga (ANIMAL)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "O Bedardeya (Tu Jhoothi Main Makkaar)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Tum Kya Mile (Rocky Aur Rani Kii Prem Kahaani)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Ve Kamleya (Rocky Aur Rani Kii Prem Kahaani)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Sajni (Laapataa Ladies)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Heeriye (Jasleen Royal)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "O Maahi (Dunki)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Chaleya (Jawan)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Dekhha Tenu (Mr. & Mrs. Mahi)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Naseeb Se (Satyaprem Ki Katha)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Aaj Ke Baad (Satyaprem Ki Katha)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Tu Hai Kahaan (AUR)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Kesariya (Brahmāstra)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Rasiya (Brahmāstra)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Raataan Lambiyan (Shershaah)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Ranjha (Shershaah)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Apna Bana Le (Bhediya)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Tere Hawaale (Laal Singh Chaddha)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Kahani (Laal Singh Chaddha)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Satranga (ANIMAL)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Pehle Bhi Main (ANIMAL)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Sajni (Laapataa Ladies)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Ve Kamleya (Rocky Aur Rani Kii Prem Kahaani)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Tum Kya Mile (Rocky Aur Rani Kii Prem Kahaani)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "O Bedardeya (Tu Jhoothi Main Makkaar)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Heeriye (Jasleen Royal)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "O Maahi (Dunki)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Chal Tere Ishq Mein (Gadar 2)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Dekhha Tenu (Mr. & Mrs. Mahi)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Naseeb Se (Satyaprem Ki Katha)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Tu Hai Kahaan (AUR)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Chaleya (Jawan)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Kesariya (Brahmāstra)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Tum Kya Mile (Rocky Aur Rani Kii Prem Kahaani)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Raataan Lambiyan (Shershaah)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Ranjha (Shershaah)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Apna Bana Le (Bhediya)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Tere Hawaale (Laal Singh Chaddha)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "O Bedardeya (Tu Jhoothi Main Makkaar)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Pehle Bhi Main (ANIMAL)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Satranga (ANIMAL)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "O Maahi (Dunki)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Kesariya (Brahmāstra)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Heeriye (Jasleen Royal)", artist: "Sadanand (Acoustic Fingerstyle Guitar)", isFavourite: true },
+  { title: "Ranjha (Shershaah)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Raataan Lambiyan (Shershaah)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Apna Bana Le (Bhediya)", artist: "Sadanand (Acoustic Guitar Solo)", isFavourite: true },
+  { title: "Pehle Bhi Main (ANIMAL)", artist: "Sadanand (Spanish Guitar)", isFavourite: true },
+  { title: "Chaleya (Jawan)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Kahani (Laal Singh Chaddha)", artist: "Sadanand (Classical Guitar)", isFavourite: true },
+  { title: "Ve Kamleya (Rocky Aur Rani Kii Prem Kahaani)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Sajni (Laapataa Ladies)", artist: "Sadanand (Acoustic Guitar Solo)", isFavourite: true },
+];
+
 export const getRetroInstrumentalCatalog = (): CatalogTrack[] => {
   const list50: CatalogTrack[] = raw1950sData.map((item, index) => {
     const cleanTitle = item.title.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -527,5 +631,24 @@ export const getRetroInstrumentalCatalog = (): CatalogTrack[] => {
     };
   });
 
-  return [...list50, ...list80, ...list00, ...list10];
+  const list20: CatalogTrack[] = raw2020sData.map((item, index) => {
+    const cleanTitle = item.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const cleanArtist = item.artist.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const id = `retro-20s-${index + 1}-${cleanArtist.slice(0, 10)}-${cleanTitle.slice(0, 15)}`;
+    const compositeKey = `${item.title}-${item.artist}`;
+    const coverIdx = getHash(compositeKey, retroCoverPool.length);
+
+    return {
+      id,
+      title: item.title,
+      artist: item.artist,
+      season: 2020,
+      url: "",
+      cover: retroCoverPool[coverIdx],
+      isFavourite: item.isFavourite,
+      era: "2020s & Beyond",
+    };
+  });
+
+  return [...list50, ...list80, ...list00, ...list10, ...list20];
 };

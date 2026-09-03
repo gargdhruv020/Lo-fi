@@ -135,6 +135,7 @@ export default function Player() {
         if (savedRaw) {
           const saved = JSON.parse(savedRaw);
           if (saved && saved.trackId) {
+            if (saved.trackId.startsWith("retro-20s-")) return "2020s & Beyond";
             if (saved.trackId.startsWith("retro-10s-")) return "2010-19s";
             if (saved.trackId.startsWith("retro-00s-")) return "2000-09s";
             if (saved.trackId.startsWith("retro-80s-")) return "1980-90s";
@@ -328,7 +329,7 @@ export default function Player() {
     (window as any).__customTrackTitle = targetTrack.title;
     navigator.mediaSession.playbackState = isPlayingRef.current ? "playing" : "paused";
 
-    const isRetro = targetTrack.season === 1950 || targetTrack.season === 1980 || targetTrack.season === 2000 || targetTrack.id.startsWith("retro-");
+    const isRetro = targetTrack.season === 1950 || targetTrack.season === 1980 || targetTrack.season === 2000 || targetTrack.season === 2010 || targetTrack.season === 2020 || targetTrack.id.startsWith("retro-");
     const albumTitle = isRetro
       ? `${targetTrack.era || "Instrumental"} Classics`
       : `Lo-Fi Radio — ${targetTrack.season === 1 ? "90s & 2000s" : targetTrack.season === 2 ? "Retro & Golden Era" : targetTrack.season === 3 ? "Modern & Indie" : "Bass Boosted"}`;
@@ -889,7 +890,7 @@ export default function Player() {
     if (!("mediaSession" in navigator) || !currentTrack) return;
 
     (window as any).__customTrackTitle = currentTrack.title;
-    const isRetro = currentTrack.season === 1950 || currentTrack.season === 1980 || currentTrack.season === 2000 || currentTrack.id.startsWith("retro-");
+    const isRetro = currentTrack.season === 1950 || currentTrack.season === 1980 || currentTrack.season === 2000 || currentTrack.season === 2010 || currentTrack.season === 2020 || currentTrack.id.startsWith("retro-");
     const albumTitle = isRetro
       ? `${currentTrack.era || "Instrumental"} Classics`
       : `Lo-Fi Radio — ${currentTrack.season === 1 ? "90s & 2000s" : currentTrack.season === 2 ? "Retro & Golden Era" : currentTrack.season === 3 ? "Modern & Indie" : "Bass Boosted"}`;
@@ -1313,6 +1314,21 @@ export default function Player() {
                     </svg>
                     2010-19s
                   </button>
+                  <button
+                    onClick={() => {
+                      setActiveListType("retro");
+                      setActiveRetroEra("2020s & Beyond");
+                      setSearchQuery("");
+                    }}
+                    className={`px-2.5 py-0.5 rounded-full font-medium transition-all flex items-center gap-1 ${
+                      activeListType === "retro" && activeRetroEra === "2020s & Beyond" ? "bg-rose-500 text-white shadow-sm" : "text-white/60 hover:text-white"
+                    }`}
+                  >
+                    <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
+                      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                    </svg>
+                    2020s & Beyond
+                  </button>
                 </div>
 
                 {/* Unified Category Play All Button */}
@@ -1368,7 +1384,7 @@ export default function Player() {
             {activeListType === "retro" ? (
               /* Integrated Era Tabs */
               <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-white/5 pr-6">
-                {(["1950-70s", "1980-90s", "2000-09s", "2010-19s", "all"] as const).map((era) => (
+                {(["1950-70s", "1980-90s", "2000-09s", "2010-19s", "2020s & Beyond", "all"] as const).map((era) => (
                   <button
                     key={era}
                     onClick={() => {
@@ -1389,7 +1405,9 @@ export default function Player() {
                       ? "2000-09s (100)"
                       : era === "2010-19s"
                       ? "2010-19s (100)"
-                      : "All (400)"}
+                      : era === "2020s & Beyond"
+                      ? "2020s & Beyond (100)"
+                      : "All (500)"}
                   </button>
                 ))}
               </div>
