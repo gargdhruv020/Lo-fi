@@ -1,6 +1,6 @@
-﻿import { CatalogTrack } from "./catalog";
+import { CatalogTrack } from "./catalog";
 
-export type RetroEra = "1950-70s" | "1980-90s" | "all";
+export type RetroEra = "1950-70s" | "1980-90s" | "2000-09s" | "all";
 
 const retroCoverPool = [
   "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=400&auto=format&fit=crop",
@@ -30,11 +30,11 @@ const getHash = (str: string, max: number) => {
 interface RawRetroTrack {
   title: string;
   artist: string;
-  era: "1950-70s" | "1980-90s";
+  era: "1950-70s" | "1980-90s" | "2000-09s";
   isFavourite?: boolean;
 }
 
-// ===== LIST 1: 1950-70s Instrumental Classics =====
+// ===== LIST 1: 1950-70s Instrumental Classics (100 Tracks) =====
 const raw1950sData: Omit<RawRetroTrack, "era">[] = [
   { title: "Lag Ja Gale (Woh Kaun Thi?)", artist: "Sunil Ganguly (Hawaiian Guitar)", isFavourite: true },
   { title: "Pal Pal Dil Ke Paas (Blackmail)", artist: "Sunil Ganguly (Electric Guitar)", isFavourite: true },
@@ -138,7 +138,7 @@ const raw1950sData: Omit<RawRetroTrack, "era">[] = [
   { title: "The Great Gambler Instrumental Theme", artist: "The Great Gambler OST (R. D. Burman)" },
 ];
 
-// ===== LIST 2: 1980-90s Instrumental Classics =====
+// ===== LIST 2: 1980-90s Instrumental Classics (100 Tracks) =====
 const raw1980sData: Omit<RawRetroTrack, "era">[] = [
   { title: "Flute & Violin Love Theme (Dilwale Dulhania Le Jayenge)", artist: "Jatin–Lalit", isFavourite: true },
   { title: "Love Theme (Piano Solo) (Jo Jeeta Wohi Sikandar)", artist: "Jatin–Lalit", isFavourite: true },
@@ -242,6 +242,110 @@ const raw1980sData: Omit<RawRetroTrack, "era">[] = [
   { title: "Taal Se Taal Mila (Taal)", artist: "Charanjit Singh (Synthesizer & Sitar)", isFavourite: true },
 ];
 
+// ===== LIST 3: 2000–09s Instrumental Classics (100 Tracks) =====
+const raw2000sData: Omit<RawRetroTrack, "era">[] = [
+  { title: "Kal Ho Naa Ho (Heartbeat Theme) (Kal Ho Naa Ho)", artist: "Shankar–Ehsaan–Loy", isFavourite: true },
+  { title: "Suraj Hua Maddham (Flute & Strings Theme) (Kabhi Khushi Kabhie Gham)", artist: "Sandesh Shandilya", isFavourite: true },
+  { title: "Love Theme (Mohabbatein)", artist: "Jatin–Lalit", isFavourite: true },
+  { title: "Violin Theme / Raj's Violin Solo (Mohabbatein)", artist: "Jatin–Lalit", isFavourite: true },
+  { title: "Tere Liye (Flute Theme) (Veer-Zaara)", artist: "Madan Mohan & Sanjeev Kohli", isFavourite: true },
+  { title: "Do Pal (Sitar & Flute Instrumental) (Veer-Zaara)", artist: "Madan Mohan & Sanjeev Kohli", isFavourite: true },
+  { title: "Main Hoon Na (Sad Instrumental Theme) (Main Hoon Na)", artist: "Anu Malik" },
+  { title: "Kaho Naa... Pyaar Hai (Love Theme / Ukulele) (Kaho Naa... Pyaar Hai)", artist: "Rajesh Roshan", isFavourite: true },
+  { title: "Rehnaa Hai Terre Dil Mein (Love Theme) (Rehnaa Hai Terre Dil Mein)", artist: "Harris Jayaraj", isFavourite: true },
+  { title: "Zara Zara (Flute & Acoustic Guitar Instrumental) (Rehnaa Hai Terre Dil Mein)", artist: "Harris Jayaraj", isFavourite: true },
+  { title: "Saathiya (Flute & Piano Theme) (Saathiya)", artist: "A. R. Rahman", isFavourite: true },
+  { title: "Hum Tum (Strings & Whistle Theme) (Hum Tum)", artist: "Jatin–Lalit", isFavourite: true },
+  { title: "Fanaa (Love Theme / Piano & Sarangi) (Fanaa)", artist: "Jatin–Lalit", isFavourite: true },
+  { title: "Guzaarish (Acoustic Guitar Interlude) (Ghajini)", artist: "A. R. Rahman", isFavourite: true },
+  { title: "Kaise Mujhe Tum Mil Gayi (Piano Theme) (Ghajini)", artist: "A. R. Rahman", isFavourite: true },
+  { title: "Kabhi Alvida Naa Kehna (Sad Piano Theme) (Kabhi Alvida Naa Kehna)", artist: "Shankar–Ehsaan–Loy", isFavourite: true },
+  { title: "Tumhi Dekho Naa (Violin Solo Theme) (Kabhi Alvida Naa Kehna)", artist: "Shankar–Ehsaan–Loy", isFavourite: true },
+  { title: "Jab We Met (Flute Background Theme) (Jab We Met)", artist: "Sandesh Shandilya", isFavourite: true },
+  { title: "Tum Se Hi (Flute & Acoustic Interlude) (Jab We Met)", artist: "Pritam", isFavourite: true },
+  { title: "Main Agar Kahoon (Piano Instrumental) (Om Shanti Om)", artist: "Vishal–Shekhar", isFavourite: true },
+  { title: "Dastaan-E-Om Shanti Om (Dark Violin Theme) (Om Shanti Om)", artist: "Vishal–Shekhar" },
+  { title: "Jodhaa Akbar (Flute & Shehnai Instrumental Theme) (Jodhaa Akbar)", artist: "A. R. Rahman", isFavourite: true },
+  { title: "Jashn-E-Bahaaraa (Flute Solo Instrumental) (Jodhaa Akbar)", artist: "A. R. Rahman", isFavourite: true },
+  { title: "Khuda Jaane (Spanish Guitar & Strings Theme) (Bachna Ae Haseeno)", artist: "Vishal–Shekhar", isFavourite: true },
+  { title: "Pee Loon (Bansuri Instrumental Theme) (Once Upon a Time in Mumbaai)", artist: "Pritam", isFavourite: true },
+  { title: "Tum Mile (Love Reprise Theme) (Tum Mile)", artist: "Pritam", isFavourite: true },
+  { title: "Dil Ibaadat (Electric Guitar Solo) (Tum Mile)", artist: "Pritam", isFavourite: true },
+  { title: "Zara Sa (Guitar & Whistle Theme) (Jannat)", artist: "Pritam", isFavourite: true },
+  { title: "Jannat (Love Theme Score) (Jannat)", artist: "Pritam", isFavourite: true },
+  { title: "Labon Ko (Acoustic Guitar Theme) (Bhool Bhulaiyaa)", artist: "Pritam" },
+  { title: "Bol Na Halke Halke (Strings & Sitar Theme) (Jhoom Barabar Jhoom)", artist: "Shankar–Ehsaan–Loy", isFavourite: true },
+  { title: "Tere Ore (Violin Interlude Theme) (Singh Is Kinng)", artist: "Pritam", isFavourite: true },
+  { title: "Soniyo (Piano & Strings Instrumental) (Raaz: The Mystery Continues)", artist: "Raju Singh" },
+  { title: "Maahi (Rock Ballad Guitar Solo) (Raaz: The Mystery Continues)", artist: "Sharib–Toshi" },
+  { title: "Woh Lamhe (Acoustic Guitar Theme) (Zeher)", artist: "Roop Kumar Rathod", isFavourite: true },
+  { title: "Agar Tum Mil Jao (Violin & Piano Theme) (Zeher)", artist: "Roop Kumar Rathod", isFavourite: true },
+  { title: "Aadat (Acoustic Guitar Instrumental) (Kalyug)", artist: "Jal The Band", isFavourite: true },
+  { title: "Jiya Dhadak Dhadak Jaye (Bansuri Theme) (Kalyug)", artist: "Rohail Hyatt", isFavourite: true },
+  { title: "Bheegey Hont (Acoustic Solo Theme) (Murder)", artist: "Anu Malik", isFavourite: true },
+  { title: "Kaho Na Kaho (Arabic Oud & Accordion Theme) (Murder)", artist: "Anu Malik" },
+  { title: "Kal Ho Naa Ho (Heartbeat Theme)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Suraj Hua Maddham (Kabhi Khushi Kabhie Gham)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Tum Se Hi (Jab We Met)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Zara Zara (Rehnaa Hai Terre Dil Mein)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Main Agar Kahoon (Om Shanti Om)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Tere Liye (Veer-Zaara)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Do Pal (Veer-Zaara)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Hum Tum (Hum Tum)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Kaho Naa... Pyaar Hai (Kaho Naa... Pyaar Hai)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Dil Ko Tumse Pyar Hua (Rehnaa Hai Terre Dil Mein)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Saathiya (Saathiya)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Kabhi Alvida Naa Kehna (Kabhi Alvida Naa Kehna)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Tumhi Dekho Naa (Kabhi Alvida Naa Kehna)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Bol Na Halke Halke (Jhoom Barabar Jhoom)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Pee Loon (Once Upon a Time in Mumbaai)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Zara Sa (Jannat)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Dil Ibaadat (Tum Mile)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Tum Mile (Tum Mile)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Agar Tum Mil Jao (Zeher)", artist: "Brian Silas (Piano)", isFavourite: true },
+  { title: "Jashn-E-Bahaaraa (Jodhaa Akbar)", artist: "Brian Silas (Grand Piano)", isFavourite: true },
+  { title: "Kal Ho Naa Ho (Kal Ho Naa Ho)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Tum Se Hi (Jab We Met)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Suraj Hua Maddham (Kabhi Khushi Kabhie Gham)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Zara Zara (Rehnaa Hai Terre Dil Mein)", artist: "Rakesh Chaurasia (Bansuri)", isFavourite: true },
+  { title: "Jashn-E-Bahaaraa (Jodhaa Akbar)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Tere Liye (Veer-Zaara)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Do Pal (Veer-Zaara)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Bol Na Halke Halke (Jhoom Barabar Jhoom)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Saathiya (Saathiya)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Pee Loon (Once Upon a Time in Mumbaai)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Main Agar Kahoon (Om Shanti Om)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Kabhi Alvida Naa Kehna (Kabhi Alvida Naa Kehna)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Dil Ko Tumse Pyar Hua (Rehnaa Hai Terre Dil Mein)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Kaise Mujhe Tum Mil Gayi (Ghajini)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Khuda Jaane (Bachna Ae Haseeno)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Hum Tum (Hum Tum)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Kaho Naa... Pyaar Hai (Kaho Naa... Pyaar Hai)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Agar Tum Mil Jao (Zeher)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Jiya Dhadak Dhadak Jaye (Kalyug)", artist: "Rakesh Chaurasia (Flute)", isFavourite: true },
+  { title: "Soniyo (Raaz: The Mystery Continues)", artist: "Pandit Ronu Majumdar (Bansuri)", isFavourite: true },
+  { title: "Kal Ho Naa Ho (Kal Ho Naa Ho)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Mohabbatein Violin Theme (Mohabbatein)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Tumhi Dekho Naa (Kabhi Alvida Naa Kehna)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Suraj Hua Maddham (Kabhi Khushi Kabhie Gham)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Tere Liye (Veer-Zaara)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Main Agar Kahoon (Om Shanti Om)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Bol Na Halke Halke (Jhoom Barabar Jhoom)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Tere Ore (Singh Is Kinng)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Hum Tum (Hum Tum)", artist: "Raj Sodha (Violin)", isFavourite: true },
+  { title: "Agar Tum Mil Jao (Zeher)", artist: "Raj Sodha (Violin Solo)", isFavourite: true },
+  { title: "Tum Se Hi (Jab We Met)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Zara Sa (Jannat)", artist: "Sadanand (Spanish Guitar)", isFavourite: true },
+  { title: "Dil Ibaadat (Tum Mile)", artist: "Sadanand (Electric Guitar)", isFavourite: true },
+  { title: "Tum Mile (Tum Mile)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Aadat (Kalyug)", artist: "Sadanand (Acoustic Guitar Solo)", isFavourite: true },
+  { title: "Bheegey Hont (Murder)", artist: "Sadanand (Classical Guitar)", isFavourite: true },
+  { title: "Woh Lamhe (Zeher)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Khuda Jaane (Bachna Ae Haseeno)", artist: "Sadanand (Flamenco Guitar)", isFavourite: true },
+  { title: "Guzaarish (Ghajini)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+  { title: "Labon Ko (Bhool Bhulaiyaa)", artist: "Sadanand (Acoustic Guitar)", isFavourite: true },
+];
+
 export const getRetroInstrumentalCatalog = (): CatalogTrack[] => {
   const list50: CatalogTrack[] = raw1950sData.map((item, index) => {
     const cleanTitle = item.title.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -281,5 +385,24 @@ export const getRetroInstrumentalCatalog = (): CatalogTrack[] => {
     };
   });
 
-  return [...list50, ...list80];
+  const list00: CatalogTrack[] = raw2000sData.map((item, index) => {
+    const cleanTitle = item.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const cleanArtist = item.artist.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const id = `retro-00s-${index + 1}-${cleanArtist.slice(0, 10)}-${cleanTitle.slice(0, 15)}`;
+    const compositeKey = `${item.title}-${item.artist}`;
+    const coverIdx = getHash(compositeKey, retroCoverPool.length);
+
+    return {
+      id,
+      title: item.title,
+      artist: item.artist,
+      season: 2000,
+      url: "",
+      cover: retroCoverPool[coverIdx],
+      isFavourite: item.isFavourite,
+      era: "2000-09s",
+    };
+  });
+
+  return [...list50, ...list80, ...list00];
 };
