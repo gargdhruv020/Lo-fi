@@ -3,8 +3,6 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { getHustleCatalog, getRetroInstrumentalCatalog, CatalogTrack, RetroEra } from "../data/catalog";
 import { getAudioService } from "../services/audioService";
-import { getBluetoothService, BluetoothConnectionState } from "../services/bluetoothService";
-import { BluetoothDiagnosticsModal } from "./BluetoothDiagnosticsModal";
 
 export default function Player() {
   // Load entire catalogs
@@ -149,19 +147,6 @@ export default function Player() {
     return "1950-70s";
   });
   const [searchQuery, setSearchQuery] = useState("");
-  const [bluetoothState, setBluetoothState] = useState<BluetoothConnectionState>("idle");
-  const [bluetoothDeviceName, setBluetoothDeviceName] = useState<string | null>(null);
-
-  useEffect(() => {
-    const btService = getBluetoothService();
-    const updateBt = () => {
-      setBluetoothState(btService.connectionState);
-      setBluetoothDeviceName(btService.connectedDeviceName);
-    };
-    updateBt();
-    const unsub = btService.subscribe(updateBt);
-    return () => unsub();
-  }, []);
 
   const playerRef = useRef<HTMLDivElement | null>(null);
   const catalogListRef = useRef<HTMLDivElement | null>(null);
@@ -1651,35 +1636,6 @@ export default function Player() {
                 </svg>
               </button>
 
-              {/* Bluetooth Audio Connect / Diagnostics Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const service = getBluetoothService();
-                  if (service.connectionState === "connected") {
-                    service.toggleHud();
-                  } else {
-                    service.connect(nativeAudioRef.current);
-                  }
-                }}
-                className={`p-1.5 rounded-full transition-all focus:outline-none active:scale-95 flex items-center justify-center relative ${
-                  bluetoothState === "connected"
-                    ? "text-cyan-400 bg-cyan-500/10 ring-1 ring-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.3)]"
-                    : bluetoothState === "connecting"
-                    ? "text-amber-400 animate-pulse bg-white/5"
-                    : "text-white/70 hover:text-white hover:bg-white/5"
-                }`}
-                aria-label="Bluetooth Audio Connection & Diagnostics"
-                title={bluetoothDeviceName ? `Connected: ${bluetoothDeviceName} (Tap for Diagnostics)` : "Connect Bluetooth Audio / Diagnostics"}
-              >
-                <svg className="w-[18px] h-[18px] fill-current" viewBox="0 0 24 24">
-                  <path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z" />
-                </svg>
-                {bluetoothState === "connected" && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
-                )}
-              </button>
-
               {/* Volume Control */}
               <div className="relative group/volume flex items-center">
                 <button
@@ -1879,35 +1835,6 @@ export default function Player() {
             </svg>
           </button>
 
-          {/* Bluetooth Audio Connect / Diagnostics (Mobile) */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              const service = getBluetoothService();
-              if (service.connectionState === "connected") {
-                service.toggleHud();
-              } else {
-                service.connect(nativeAudioRef.current);
-              }
-            }}
-            className={`p-2.5 rounded-full transition-all focus:outline-none active:scale-95 relative ${
-              bluetoothState === "connected"
-                ? "text-cyan-400 bg-cyan-500/10 ring-1 ring-cyan-500/40"
-                : bluetoothState === "connecting"
-                ? "text-amber-400 animate-pulse bg-white/5"
-                : "text-white/70 hover:text-white"
-            }`}
-            aria-label="Bluetooth Audio Connection"
-            title={bluetoothDeviceName ? `Connected: ${bluetoothDeviceName}` : "Connect Bluetooth Audio"}
-          >
-            <svg className="w-[19px] h-[19px] fill-current" viewBox="0 0 24 24">
-              <path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z" />
-            </svg>
-            {bluetoothState === "connected" && (
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
-            )}
-          </button>
-
           {/* Audio Transport */}
           <div className="flex items-center gap-4">
             <button
@@ -1965,9 +1892,6 @@ export default function Player() {
           </button>
         </div>
       </div>
-
-      {/* Bluetooth Diagnostics & Error Inspector Modal */}
-      <BluetoothDiagnosticsModal audioElement={nativeAudioRef.current} />
     </div>
   );
 }
